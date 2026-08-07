@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>實驗室藥品管理系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body class="bg-gray-100 p-4 md:p-8">
+    <div class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-md">
+        <h1 class="text-2xl font-bold mb-6 text-gray-800 text-center">🧪 實驗室藥品檔案管理系統</h1>
+
+        <!-- 手機相機掃條碼區域 -->
+        <div class="mb-6 bg-gray-50 p-4 rounded-lg border">
+            <h2 class="font-semibold text-gray-700 mb-2">相機掃描條碼</h2>
+            <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto;"></div>
+            <button onclick="startScan()" class="mt-2 w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700">開啟相機掃描</button>
+        </div>
+
+        <!-- 快速搜尋 / 條碼輸入區 -->
+        <div class="mb-8">
+            <label class="block text-sm font-medium text-gray-700 mb-1">搜尋藥品或刷條碼 (支援名稱、位置、條碼)</label>
+            <div class="flex gap-2">
+                <input type="text" id="searchInput" placeholder="請刷條碼或輸入藥品名稱/位置..." class="flex-1 border border-gray-300 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <button onclick="performSearch()" class="bg-gray-800 text-white px-6 py-2 rounded-lg hover:bg-gray-900">搜尋</button>
+            </div>
+        </div>
+
+        <!-- 搜尋結果顯示區 -->
+        <div class="mb-8">
+            <h2 class="text-lg font-bold mb-3 text-gray-700">查詢結果</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-200 text-gray-700 text-sm">
+                            <th class="p-2 border">條碼</th>
+                            <th class="p-2 border">藥品名稱</th>
+                            <th class="p-2 border">安衛分類</th>
+                            <th class="p-2 border">擺放位置座標</th>
+                            <th class="p-2 border">規格</th>
+                            <th class="p-2 border">備註</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultTable" class="text-sm">
+                        <tr><td colspan="6" class="p-4 text-center text-gray-500">請輸入關鍵字或刷條碼查詢</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <hr class="my-6">
+
+        <!-- 新增藥品建檔表單 -->
+        <div>
+            <h2 class="text-lg font-bold mb-4 text-gray-700">➕ 新增藥品建檔</h2>
+            <form id="addForm" onsubmit="submitChemical(event)" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">瓶身條碼 *</label>
+                    <input type="text" id="addBarcode" required placeholder="例如：CHEM-00101" class="w-full border p-2 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">藥品名稱 *</label>
+                    <input type="text" id="addName" required placeholder="例如：Acetone (丙酮)" class="w-full border p-2 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">安衛相容性分類 *</label>
+                    <select id="addSafetyClass" required class="w-full border p-2 rounded-lg">
+                        <option value="">-- 請選擇 --</option>
+                        <option value="易燃溶劑櫃">易燃溶劑 (Flammable)</option>
+                        <option value="無機酸櫃">無機酸 (Inorganic Acid)</option>
+                        <option value="有機酸櫃">有機酸 (Organic Acid)</option>
+                        <option value="鹼類櫃">鹼類 (Base)</option>
+                        <option value="氧化劑櫃">強氧化劑 (Oxidizer)</option>
+                        <option value="一般試劑櫃">一般有機試劑 (General Organic)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">擺放位置座標 *</label>
+                    <input type="text" id="addLocation" required placeholder="例如：CAB-02-B-01 (櫃號-層號-區號)" class="w-full border p-2 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">規格/容量</label>
+                    <input type="text" id="addCapacity" placeholder="例如：500 mL / 99.5%" class="w-full border p-2 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">備註</label>
+                    <input type="text" id="addNote" placeholder="例如：開瓶日期或廠商" class="w-full border p-2 rounded-lg">
+                </div>
+                <div class="md:col-span-2">
+                    <button type="submit" class="w-full bg-green-600 text-white py-2 rounded-lg font-bold hover:bg-green-700">確認建檔</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://" + window.location.hostname + ":8000";
+
+        async function performSearch(query = null) {
+            const q = query || document.getElementById('searchInput').value;
+            if(!q) return;
+            
+            const res = await fetch(`${API_URL}/api/chemicals/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            
+            const tbody = document.getElementById('resultTable');
+            tbody.innerHTML = '';
+            
+            if(data.results.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-red-500">查無此藥品資料！</td></tr>';
+                return;
+            }
+
+            data.results.forEach(chem => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50 border-b">
+                        <td class="p-2 border font-mono font-bold text-indigo-600">${chem.barcode}</td>
+                        <td class="p-2 border font-medium">${chem.name}</td>
+                        <td class="p-2 border">${chem.safety_class}</td>
+                        <td class="p-2 border font-bold text-green-700">${chem.location_id}</td>
+                        <td class="p-2 border">${chem.capacity}</td>
+                        <td class="p-2 border text-gray-500">${chem.note}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function submitChemical(e) {
+            e.preventDefault();
+            const body = {
+                barcode: document.getElementById('addBarcode').value,
+                name: document.getElementById('addName').value,
+                safety_class: document.getElementById('addSafetyClass').value,
+                location_id: document.getElementById('addLocation').value,
+                capacity: document.getElementById('addCapacity').value,
+                note: document.getElementById('addNote').value,
+            };
+
+            const res = await fetch(`${API_URL}/api/chemicals`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            if(res.ok) {
+                alert("建檔成功！");
+                document.getElementById('addForm').reset();
+                performSearch(body.barcode);
+            } else {
+                const error = await res.json();
+                alert("錯誤：" + error.detail);
+            }
+        }
+
+        function startScan() {
+            const html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 150 } },
+                (decodedText) => {
+                    document.getElementById('searchInput').value = decodedText;
+                    performSearch(decodedText);
+                    html5QrCode.stop();
+                },
+                (errorMessage) => {}
+            );
+        }
+
+        document.getElementById('searchInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') performSearch();
+        });
+    </script>
+</body>
+</html>

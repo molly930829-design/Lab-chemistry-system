@@ -139,7 +139,12 @@
         tbody.innerHTML = '<tr><td colspan="9" class="text-center text-primary">搜尋中...</td></tr>';
 
         try {
-            const res = await fetch('/api/search?q=' + encodeURIComponent(query));
+            // 使用 URLSearchParams 解決 Safari 網址編碼相容性問題
+            const params = new URLSearchParams({ q: query });
+            const res = await fetch('/api/search?' + params.toString());
+            
+            if (!res.ok) throw new Error('伺服器回應錯誤 (HTTP ' + res.status + ')');
+            
             currentSearchResults = await res.json();
             renderResults();
         } catch (err) {

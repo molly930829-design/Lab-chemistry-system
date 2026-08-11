@@ -3,173 +3,285 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>實驗室藥品管理系統</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Lab Chemical Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { background-color: #f8f9fa; padding: 20px; }
+        .container { max-width: 900px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #reader { width: 100%; max-width: 500px; margin: 0 auto; display: none; }
+        .lang-btn { position: absolute; top: 20px; right: 20px; }
+    </style>
 </head>
-<body class="bg-gray-100 p-4 md:p-8">
-    <div class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-md">
-        <h1 class="text-2xl font-bold mb-6 text-gray-800 text-center">🧪 實驗室藥品檔案管理系統</h1>
+<body>
 
-        <!-- 手機相機掃條碼區域 -->
-        <div class="mb-6 bg-gray-50 p-4 rounded-lg border">
-            <h2 class="font-semibold text-gray-700 mb-2">相機掃描條碼</h2>
-            <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto;"></div>
-            <button onclick="startScan()" class="mt-2 w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700">開啟相機掃描</button>
-        </div>
+<div class="container position-relative">
+    <!-- 語言切換按鈕 -->
+    <button class="btn btn-outline-secondary lang-btn btn-sm" onclick="toggleLanguage()" id="langBtn">English</button>
 
-        <!-- 快速搜尋 / 條碼輸入區 -->
-        <div class="mb-8">
-            <label class="block text-sm font-medium text-gray-700 mb-1">搜尋藥品或刷條碼 (支援名稱、位置、條碼)</label>
-            <div class="flex gap-2">
-                <input type="text" id="searchInput" placeholder="請刷條碼或輸入藥品名稱/位置..." class="flex-1 border border-gray-300 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <button onclick="performSearch()" class="bg-gray-800 text-white px-6 py-2 rounded-lg hover:bg-gray-900">搜尋</button>
-            </div>
-        </div>
+    <h2 class="text-center mb-4" id="title">🧪 實驗室藥品檔案管理系統</h2>
 
-        <!-- 搜尋結果顯示區 -->
-        <div class="mb-8">
-            <h2 class="text-lg font-bold mb-3 text-gray-700">查詢結果</h2>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-gray-200 text-gray-700 text-sm">
-                            <th class="p-2 border">條碼</th>
-                            <th class="p-2 border">藥品名稱</th>
-                            <th class="p-2 border">安衛分類</th>
-                            <th class="p-2 border">擺放位置座標</th>
-                            <th class="p-2 border">規格</th>
-                            <th class="p-2 border">備註</th>
-                        </tr>
-                    </thead>
-                    <tbody id="resultTable" class="text-sm">
-                        <tr><td colspan="6" class="p-4 text-center text-gray-500">請輸入關鍵字或刷條碼查詢</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <hr class="my-6">
-
-        <!-- 新增藥品建檔表單 -->
-        <div>
-            <h2 class="text-lg font-bold mb-4 text-gray-700">➕ 新增藥品建檔</h2>
-            <form id="addForm" onsubmit="submitChemical(event)" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">瓶身條碼 *</label>
-                    <input type="text" id="addBarcode" required placeholder="例如：CHEM-00101" class="w-full border p-2 rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">藥品名稱 *</label>
-                    <input type="text" id="addName" required placeholder="例如：Acetone (丙酮)" class="w-full border p-2 rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">安衛相容性分類 *</label>
-                    <select id="addSafetyClass" required class="w-full border p-2 rounded-lg">
-                        <option value="">-- 請選擇 --</option>
-                        <option value="易燃溶劑櫃">易燃溶劑 (Flammable)</option>
-                        <option value="無機酸櫃">無機酸 (Inorganic Acid)</option>
-                        <option value="有機酸櫃">有機酸 (Organic Acid)</option>
-                        <option value="鹼類櫃">鹼類 (Base)</option>
-                        <option value="氧化劑櫃">強氧化劑 (Oxidizer)</option>
-                        <option value="一般試劑櫃">一般有機試劑 (General Organic)</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">擺放位置座標 *</label>
-                    <input type="text" id="addLocation" required placeholder="例如：CAB-02-B-01 (櫃號-層號-區號)" class="w-full border p-2 rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">規格/容量</label>
-                    <input type="text" id="addCapacity" placeholder="例如：500 mL / 99.5%" class="w-full border p-2 rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">備註</label>
-                    <input type="text" id="addNote" placeholder="例如：開瓶日期或廠商" class="w-full border p-2 rounded-lg">
-                </div>
-                <div class="md:col-span-2">
-                    <button type="submit" class="w-full bg-green-600 text-white py-2 rounded-lg font-bold hover:bg-green-700">確認建檔</button>
-                </div>
-            </form>
+    <!-- 相機掃描區 -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white" id="scanHeader">相機掃描條碼</div>
+        <div class="card-body text-center">
+            <button class="btn btn-primary w-100 mb-3" onclick="toggleScanner()" id="btnScan">開啟相機掃描</button>
+            <div id="reader"></div>
         </div>
     </div>
 
-    <script>
-        const API_URL = "http://" + window.location.hostname + ":8000";
+    <!-- 搜尋區 -->
+    <div class="mb-4">
+        <label for="searchInput" class="form-label fw-bold" id="searchLabel">搜尋藥品或刷條碼 (支援名稱、位置、條碼)</label>
+        <div class="input-group">
+            <input type="text" id="searchInput" class="form-control" placeholder="請刷條碼或輸入藥品名稱/位置..." onkeypress="handleKeyPress(event)">
+            <button class="btn btn-dark" onclick="searchChemical()" id="btnSearch">搜尋</button>
+        </div>
+    </div>
 
-        async function performSearch(query = null) {
-            const q = query || document.getElementById('searchInput').value;
-            if(!q) return;
-            
-            const res = await fetch(`${API_URL}/api/chemicals/search?q=${encodeURIComponent(q)}`);
-            const data = await res.json();
-            
-            const tbody = document.getElementById('resultTable');
-            tbody.innerHTML = '';
-            
-            if(data.results.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-red-500">查無此藥品資料！</td></tr>';
-                return;
-            }
+    <!-- 查詢結果表格 -->
+    <h4 id="resultHeader">查詢結果</h4>
+    <div class="table-responsive mb-4">
+        <table class="table table-bordered table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th id="thBarcode">條碼</th>
+                    <th id="thName">藥品名稱</th>
+                    <th id="thSafety">安衛分類</th>
+                    <th id="thLocation">擺放位置座標</th>
+                    <th id="thSpec">規格</th>
+                    <th id="thNote">備註</th>
+                </tr>
+            </thead>
+            <tbody id="resultBody">
+                <tr><td colspan="6" class="text-center text-muted" id="noData">請輸入關鍵字或刷條碼查詢</td></tr>
+            </tbody>
+        </table>
+    </div>
 
-            data.results.forEach(chem => {
-                tbody.innerHTML += `
-                    <tr class="hover:bg-gray-50 border-b">
-                        <td class="p-2 border font-mono font-bold text-indigo-600">${chem.barcode}</td>
-                        <td class="p-2 border font-medium">${chem.name}</td>
-                        <td class="p-2 border">${chem.safety_class}</td>
-                        <td class="p-2 border font-bold text-green-700">${chem.location_id}</td>
-                        <td class="p-2 border">${chem.capacity}</td>
-                        <td class="p-2 border text-gray-500">${chem.note}</td>
-                    </tr>
-                `;
-            });
+    <hr>
+
+    <!-- 新增藥品建檔 -->
+    <h4 class="mb-3" id="addHeader">➕ 新增藥品建檔</h4>
+    <form id="addForm" onsubmit="addChemical(event)">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" id="lblAddBarcode">瓶身條碼 *</label>
+                <input type="text" id="addBarcode" class="form-control" placeholder="例如：CHEM-00101" required>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" id="lblAddName">藥品名稱 *</label>
+                <input type="text" id="addName" class="form-control" placeholder="例如：Acetone (丙酮)" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" id="lblAddSafety">安衛分類</label>
+                <input type="text" id="addSafety" class="form-control" placeholder="例如：易燃液體">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" id="lblAddLocation">擺放位置座標</label>
+                <input type="text" id="addLocation" class="form-control" placeholder="例如：櫃A-3">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" id="lblAddSpec">規格</label>
+                <input type="text" id="addSpec" class="form-control" placeholder="例如：500mL / 99.5%">
+            </div>
+            <div class="col-12">
+                <label class="form-label" id="lblAddNote">備註</label>
+                <input type="text" id="addNote" class="form-control" placeholder="備註事項...">
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-success w-100" id="btnSubmit">儲存建檔</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    let currentLang = 'zh';
+    const dict = {
+        zh: {
+            langBtn: "English",
+            title: "🧪 實驗室藥品檔案管理系統",
+            scanHeader: "相機掃描條碼",
+            btnScanOpen: "開啟相機掃描",
+            btnScanClose: "關閉相機",
+            searchLabel: "搜尋藥品或刷條碼 (支援名稱、位置、條碼)",
+            searchPlaceholder: "請刷條碼或輸入藥品名稱/位置...",
+            btnSearch: "搜尋",
+            resultHeader: "查詢結果",
+            thBarcode: "條碼",
+            thName: "藥品名稱",
+            thSafety: "安衛分類",
+            thLocation: "擺放位置座標",
+            thSpec: "規格",
+            thNote: "備註",
+            noData: "請輸入關鍵字或刷條碼查詢",
+            notFound: "查無此藥品資料",
+            addHeader: "➕ 新增藥品建檔",
+            lblAddBarcode: "瓶身條碼 *",
+            lblAddName: "藥品名稱 *",
+            lblAddSafety: "安衛分類",
+            lblAddLocation: "擺放位置座標",
+            lblAddSpec: "規格",
+            lblAddNote: "備註",
+            btnSubmit: "儲存建檔",
+            saveSuccess: "建檔成功！",
+            saveFail: "建檔失敗，條碼可能重複了。"
+        },
+        en: {
+            langBtn: "中文",
+            title: "🧪 Lab Chemical Management System",
+            scanHeader: "Barcode Scanner",
+            btnScanOpen: "Start Camera Scan",
+            btnScanClose: "Close Camera",
+            searchLabel: "Search Chemical or Scan Barcode (Name, Location, Barcode)",
+            searchPlaceholder: "Scan barcode or enter name/location...",
+            btnSearch: "Search",
+            resultHeader: "Search Results",
+            thBarcode: "Barcode",
+            thName: "Chemical Name",
+            thSafety: "Safety Class",
+            thLocation: "Location",
+            thSpec: "Spec",
+            thNote: "Note",
+            noData: "Enter keywords or scan barcode to search",
+            notFound: "No chemical found",
+            addHeader: "➕ Add New Chemical",
+            lblAddBarcode: "Bottle Barcode *",
+            lblAddName: "Chemical Name *",
+            lblAddSafety: "Safety Class",
+            lblAddLocation: "Location",
+            lblAddSpec: "Specification",
+            lblAddNote: "Note",
+            btnSubmit: "Save Chemical",
+            saveSuccess: "Saved successfully!",
+            saveFail: "Failed to save. Barcode might already exist."
         }
+    };
 
-        async function submitChemical(e) {
-            e.preventDefault();
-            const body = {
-                barcode: document.getElementById('addBarcode').value,
-                name: document.getElementById('addName').value,
-                safety_class: document.getElementById('addSafetyClass').value,
-                location_id: document.getElementById('addLocation').value,
-                capacity: document.getElementById('addCapacity').value,
-                note: document.getElementById('addNote').value,
-            };
+    function toggleLanguage() {
+        currentLang = currentLang === 'zh' ? 'en' : 'zh';
+        const t = dict[currentLang];
 
-            const res = await fetch(`${API_URL}/api/chemicals`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
+        document.getElementById('langBtn').innerText = t.langBtn;
+        document.getElementById('title').innerText = t.title;
+        document.getElementById('scanHeader').innerText = t.scanHeader;
+        document.getElementById('btnScan').innerText = isScanning ? t.btnScanClose : t.btnScanOpen;
+        document.getElementById('searchLabel').innerText = t.searchLabel;
+        document.getElementById('searchInput').placeholder = t.searchPlaceholder;
+        document.getElementById('btnSearch').innerText = t.btnSearch;
+        document.getElementById('resultHeader').innerText = t.resultHeader;
+        document.getElementById('thBarcode').innerText = t.thBarcode;
+        document.getElementById('thName').innerText = t.thName;
+        document.getElementById('thSafety').innerText = t.thSafety;
+        document.getElementById('thLocation').innerText = t.thLocation;
+        document.getElementById('thSpec').innerText = t.thSpec;
+        document.getElementById('thNote').innerText = t.thNote;
+        document.getElementById('addHeader').innerText = t.addHeader;
+        document.getElementById('lblAddBarcode').innerText = t.lblAddBarcode;
+        document.getElementById('lblAddName').innerText = t.lblAddName;
+        document.getElementById('lblAddSafety').innerText = t.lblAddSafety;
+        document.getElementById('lblAddLocation').innerText = t.lblAddLocation;
+        document.getElementById('lblAddSpec').innerText = t.lblAddSpec;
+        document.getElementById('lblAddNote').innerText = t.lblAddNote;
+        document.getElementById('btnSubmit').innerText = t.btnSubmit;
 
-            if(res.ok) {
-                alert("建檔成功！");
-                document.getElementById('addForm').reset();
-                performSearch(body.barcode);
-            } else {
-                const error = await res.json();
-                alert("錯誤：" + error.detail);
-            }
-        }
+        const noDataElem = document.getElementById('noData');
+        if (noDataElem) noDataElem.innerText = t.noData;
+    }
 
-        function startScan() {
-            const html5QrCode = new Html5Qrcode("reader");
+    let html5QrCode;
+    let isScanning = false;
+
+    function toggleScanner() {
+        const t = dict[currentLang];
+        if (!isScanning) {
+            document.getElementById('reader').style.display = 'block';
+            html5QrCode = new Html5Qrcode("reader");
             html5QrCode.start(
                 { facingMode: "environment" },
                 { fps: 10, qrbox: { width: 250, height: 150 } },
                 (decodedText) => {
                     document.getElementById('searchInput').value = decodedText;
-                    performSearch(decodedText);
-                    html5QrCode.stop();
+                    searchChemical();
+                    toggleScanner();
                 },
                 (errorMessage) => {}
             );
+            document.getElementById('btnScan').innerText = t.btnScanClose;
+            document.getElementById('btnScan').classList.replace('btn-primary', 'btn-danger');
+            isScanning = true;
+        } else {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    document.getElementById('reader').style.display = 'none';
+                    document.getElementById('btnScan').innerText = t.btnScanOpen;
+                    document.getElementById('btnScan').classList.replace('btn-danger', 'btn-primary');
+                    isScanning = false;
+                });
+            }
+        }
+    }
+
+    function handleKeyPress(e) {
+        if (e.key === 'Enter') searchChemical();
+    }
+
+    async function searchChemical() {
+        const query = document.getElementById('searchInput').value.trim();
+        const t = dict[currentLang];
+        if (!query) return;
+
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        const tbody = document.getElementById('resultBody');
+        tbody.innerHTML = '';
+
+        if (data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">${t.notFound}</td></tr>`;
+            return;
         }
 
-        document.getElementById('searchInput').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') performSearch();
+        data.forEach(item => {
+            tbody.innerHTML += `
+                <tr>
+                    <td><code>${item.barcode}</code></td>
+                    <td><b>${item.name}</b></td>
+                    <td>${item.safety_class || '-'}</td>
+                    <td>${item.location || '-'}</td>
+                    <td>${item.spec || '-'}</td>
+                    <td>${item.note || '-'}</td>
+                </tr>
+            `;
         });
-    </script>
+    }
+
+    async function addChemical(e) {
+        e.preventDefault();
+        const t = dict[currentLang];
+        const payload = {
+            barcode: document.getElementById('addBarcode').value.trim(),
+            name: document.getElementById('addName').value.trim(),
+            safety_class: document.getElementById('addSafety').value.trim(),
+            location: document.getElementById('addLocation').value.trim(),
+            spec: document.getElementById('addSpec').value.trim(),
+            note: document.getElementById('addNote').value.trim()
+        };
+
+        const res = await fetch('/api/add_chemical', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            alert(t.saveSuccess);
+            document.getElementById('addForm').reset();
+        } else {
+            alert(t.saveFail);
+        }
+    }
+</script>
+
 </body>
 </html>

@@ -10,16 +10,20 @@
         body { background-color: #f8f9fa; padding: 20px; }
         .container { max-width: 1100px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         #reader { width: 100%; max-width: 400px; margin: 0 auto; display: none; }
+        .lang-btn { position: absolute; top: 25px; right: 30px; }
     </style>
 </head>
 <body>
 
 <div class="container position-relative">
-    <h2 class="text-center mb-4">🧪 實驗室藥品精密管理系統</h2>
+    <!-- 語言切換按鈕 -->
+    <button class="btn btn-outline-secondary lang-btn btn-sm" onclick="toggleLanguage()" id="langBtn">English</button>
+
+    <h2 class="text-center mb-4" id="title">🧪 實驗室藥品精密管理系統</h2>
 
     <!-- 相機掃描區 -->
     <div class="card mb-4">
-        <div class="card-header bg-primary text-white fw-bold">相機條碼掃描</div>
+        <div class="card-header bg-primary text-white fw-bold" id="scanHeader">相機條碼掃描</div>
         <div class="card-body text-center">
             <button class="btn btn-primary w-100 mb-2" id="btnScan" onclick="toggleScanner()">開啟相機掃描</button>
             <div id="reader"></div>
@@ -28,10 +32,10 @@
 
     <!-- 模糊搜尋區 -->
     <div class="mb-4">
-        <label for="searchInput" class="form-label fw-bold">🔍 藥品搜尋 (支援名稱模糊搜尋、CAS No.、SMILES 結構式、條碼、擺放位置)</label>
+        <label for="searchInput" class="form-label fw-bold" id="searchLabel">🔍 藥品搜尋 (支援名稱模糊搜尋、CAS No.、SMILES 結構式、條碼、擺放位置)</label>
         <div class="input-group">
             <input type="text" id="searchInput" class="form-control" placeholder="輸入關鍵字（留空可列出所有藥品）..." onkeypress="handleKeyPress(event)">
-            <button class="btn btn-dark" type="button" onclick="searchChemical()">搜尋</button>
+            <button class="btn btn-dark" type="button" onclick="searchChemical()" id="btnSearch">搜尋</button>
         </div>
     </div>
 
@@ -41,19 +45,19 @@
         <table class="table table-bordered table-hover align-middle">
             <thead class="table-light">
                 <tr>
-                    <th>條碼</th>
-                    <th>藥品名稱</th>
-                    <th>CAS No.</th>
-                    <th>SMILES 結構式</th>
-                    <th>安衛分類</th>
-                    <th>位置座標</th>
-                    <th>規格</th>
-                    <th>備註</th>
-                    <th>操作</th>
+                    <th id="thBarcode">條碼</th>
+                    <th id="thName">藥品名稱</th>
+                    <th id="thCas">CAS No.</th>
+                    <th id="thSmiles">SMILES 結構式</th>
+                    <th id="thSafety">安衛分類</th>
+                    <th id="thLocation">位置座標</th>
+                    <th id="thSpec">規格</th>
+                    <th id="thNote">備註</th>
+                    <th id="thAction">操作</th>
                 </tr>
             </thead>
             <tbody id="resultBody">
-                <tr><td colspan="9" class="text-center text-muted">請點擊搜尋或輸入關鍵字</td></tr>
+                <tr><td colspan="9" class="text-center text-muted" id="initialText">請點擊搜尋或輸入關鍵字</td></tr>
             </tbody>
         </table>
     </div>
@@ -61,29 +65,29 @@
     <hr>
 
     <!-- 新增 / 修改藥品建檔 -->
-    <h4 class="mb-3">➕ 新增 / 修改藥品建檔</h4>
+    <h4 class="mb-3" id="addHeader">➕ 新增 / 修改藥品建檔</h4>
     <form id="addForm" onsubmit="addChemical(event)">
         <div class="row g-3">
             <div class="col-md-4">
-                <label class="form-label fw-bold">瓶身條碼 *</label>
+                <label class="form-label fw-bold" id="lblBarcode">瓶身條碼 *</label>
                 <input type="text" id="addBarcode" class="form-control" placeholder="例如：CHEM-00001" required>
             </div>
             <div class="col-md-4">
-                <label class="form-label fw-bold">藥品名稱 *</label>
+                <label class="form-label fw-bold" id="lblName">藥品名稱 *</label>
                 <input type="text" id="addName" class="form-control" placeholder="例如：tert-Butyl acetate" required>
             </div>
             <div class="col-md-4">
-                <label class="form-label fw-bold">CAS Number</label>
+                <label class="form-label fw-bold" id="lblCas">CAS Number</label>
                 <input type="text" id="addCas" class="form-control" placeholder="例如：540-88-5">
             </div>
 
             <div class="col-md-6">
-                <label class="form-label fw-bold">SMILES 結構式</label>
+                <label class="form-label fw-bold" id="lblSmiles">SMILES 結構式</label>
                 <input type="text" id="addSmiles" class="form-control" placeholder="例如：CC(C)(C)OC(=O)C">
             </div>
 
             <div class="col-md-3">
-                <label class="form-label fw-bold">安衛分類 *</label>
+                <label class="form-label fw-bold" id="lblSafety">安衛分類 *</label>
                 <select id="addSafety" class="form-select" required>
                     <option value="">-- 請選擇分類 --</option>
                     <option value="一般藥品">一般藥品 (General)</option>
@@ -96,7 +100,7 @@
             </div>
 
             <div class="col-md-3">
-                <label class="form-label fw-bold">擺放位置座標 *</label>
+                <label class="form-label fw-bold" id="lblLocation">擺放位置座標 *</label>
                 <select id="addLocation" class="form-select" required>
                     <option value="">-- 請選擇位置 --</option>
                     <option value="防爆櫃 A-1">防爆櫃 A-1</option>
@@ -110,54 +114,175 @@
             </div>
 
             <div class="col-md-6">
-                <label class="form-label">規格 / 純度</label>
+                <label class="form-label" id="lblSpec">規格 / 純度</label>
                 <input type="text" id="addSpec" class="form-control" placeholder="例如：500mL / 99%">
             </div>
             <div class="col-md-6">
-                <label class="form-label">備註</label>
+                <label class="form-label" id="lblNote">備註</label>
                 <input type="text" id="addNote" class="form-control" placeholder="例如：開瓶日期、保管人...">
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-success w-100 fw-bold">儲存建檔 / 更新資料</button>
+                <button type="submit" class="btn btn-success w-100 fw-bold" id="btnSubmit">儲存建檔 / 更新資料</button>
             </div>
         </div>
     </form>
 </div>
 
 <script>
+    let currentLang = 'zh';
     let currentSearchResults = [];
     let html5QrCode;
     let isScanning = false;
+
+    const dict = {
+        zh: {
+            langBtn: "English",
+            title: "🧪 實驗室藥品精密管理系統",
+            scanHeader: "相機條碼掃描",
+            btnScanOpen: "開啟相機掃描",
+            btnScanClose: "關閉相機",
+            searchLabel: "🔍 藥品搜尋 (支援名稱模糊搜尋、CAS No.、SMILES 結構式、條碼、擺放位置)",
+            searchPlaceholder: "輸入關鍵字（留空可列出所有藥品）...",
+            btnSearch: "搜尋",
+            resultHeader: "查詢結果",
+            thBarcode: "條碼",
+            thName: "藥品名稱",
+            thCas: "CAS No.",
+            thSmiles: "SMILES 結構式",
+            thSafety: "安衛分類",
+            thLocation: "位置座標",
+            thSpec: "規格",
+            thNote: "備註",
+            thAction: "操作",
+            initialText: "請點擊搜尋或輸入關鍵字",
+            searching: "搜尋中...",
+            notFound: "查無相關藥品資料",
+            addHeader: "➕ 新增 / 修改藥品建檔",
+            lblBarcode: "瓶身條碼 *",
+            lblName: "藥品名稱 *",
+            lblCas: "CAS Number",
+            lblSmiles: "SMILES 結構式",
+            lblSafety: "安衛分類 *",
+            lblLocation: "擺放位置座標 *",
+            lblSpec: "規格 / 純度",
+            lblNote: "備註",
+            btnSubmit: "儲存建檔 / 更新資料",
+            btnEdit: "編輯",
+            btnDelete: "刪除",
+            confirmDelete: "確定要刪除這筆藥品資料嗎？",
+            saveSuccess: "儲存成功！",
+            saveFail: "儲存失敗",
+            connFail: "連線失敗："
+        },
+        en: {
+            langBtn: "中文",
+            title: "🧪 Precision Lab Chemical Management System",
+            scanHeader: "Barcode Scanner",
+            btnScanOpen: "Start Camera Scan",
+            btnScanClose: "Close Camera",
+            searchLabel: "🔍 Chemical Search (Fuzzy Name, CAS No., SMILES, Barcode, Location)",
+            searchPlaceholder: "Type keywords (leave empty to list all)...",
+            btnSearch: "Search",
+            resultHeader: "Search Results",
+            thBarcode: "Barcode",
+            thName: "Chemical Name",
+            thCas: "CAS No.",
+            thSmiles: "SMILES",
+            thSafety: "Safety Class",
+            thLocation: "Location",
+            thSpec: "Spec",
+            thNote: "Note",
+            thAction: "Action",
+            initialText: "Click search or enter keywords",
+            searching: "Searching...",
+            notFound: "No matching chemical found",
+            addHeader: "➕ Add / Edit Chemical",
+            lblBarcode: "Bottle Barcode *",
+            lblName: "Chemical Name *",
+            lblCas: "CAS Number",
+            lblSmiles: "SMILES Structure",
+            lblSafety: "Safety Class *",
+            lblLocation: "Location *",
+            lblSpec: "Spec / Purity",
+            lblNote: "Note",
+            btnSubmit: "Save / Update Chemical",
+            btnEdit: "Edit",
+            btnDelete: "Delete",
+            confirmDelete: "Are you sure you want to delete this chemical?",
+            saveSuccess: "Saved successfully!",
+            saveFail: "Failed to save",
+            connFail: "Connection failed: "
+        }
+    };
+
+    function toggleLanguage() {
+        currentLang = currentLang === 'zh' ? 'en' : 'zh';
+        const t = dict[currentLang];
+
+        document.getElementById('langBtn').innerText = t.langBtn;
+        document.getElementById('title').innerText = t.title;
+        document.getElementById('scanHeader').innerText = t.scanHeader;
+        document.getElementById('btnScan').innerText = isScanning ? t.btnScanClose : t.btnScanOpen;
+        document.getElementById('searchLabel').innerText = t.searchLabel;
+        document.getElementById('searchInput').placeholder = t.searchPlaceholder;
+        document.getElementById('btnSearch').innerText = t.btnSearch;
+        document.getElementById('resultHeader').innerText = t.resultHeader;
+        document.getElementById('thBarcode').innerText = t.thBarcode;
+        document.getElementById('thName').innerText = t.thName;
+        document.getElementById('thCas').innerText = t.thCas;
+        document.getElementById('thSmiles').innerText = t.thSmiles;
+        document.getElementById('thSafety').innerText = t.thSafety;
+        document.getElementById('thLocation').innerText = t.thLocation;
+        document.getElementById('thSpec').innerText = t.thSpec;
+        document.getElementById('thNote').innerText = t.thNote;
+        document.getElementById('thAction').innerText = t.thAction;
+        document.getElementById('addHeader').innerText = t.addHeader;
+        document.getElementById('lblBarcode').innerText = t.lblBarcode;
+        document.getElementById('lblName').innerText = t.lblName;
+        document.getElementById('lblCas').innerText = t.lblCas;
+        document.getElementById('lblSmiles').innerText = t.lblSmiles;
+        document.getElementById('lblSafety').innerText = t.lblSafety;
+        document.getElementById('lblLocation').innerText = t.lblLocation;
+        document.getElementById('lblSpec').innerText = t.lblSpec;
+        document.getElementById('lblNote').innerText = t.lblNote;
+        document.getElementById('btnSubmit').innerText = t.btnSubmit;
+
+        const initialElem = document.getElementById('initialText');
+        if (initialElem) initialElem.innerText = t.initialText;
+
+        renderResults();
+    }
 
     function handleKeyPress(e) {
         if (e.key === 'Enter') searchChemical();
     }
 
     async function searchChemical() {
+        const t = dict[currentLang];
         const query = document.getElementById('searchInput').value.trim();
         const tbody = document.getElementById('resultBody');
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-primary">搜尋中...</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-primary">${t.searching}</td></tr>`;
 
         try {
-            // 使用 URLSearchParams 解決 Safari 網址編碼相容性問題
             const params = new URLSearchParams({ q: query });
             const res = await fetch('/api/search?' + params.toString());
             
-            if (!res.ok) throw new Error('伺服器回應錯誤 (HTTP ' + res.status + ')');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
             
             currentSearchResults = await res.json();
             renderResults();
         } catch (err) {
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger">搜尋連線失敗：' + err.message + '</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger">${t.connFail} ${err.message}</td></tr>`;
         }
     }
 
     function renderResults() {
+        const t = dict[currentLang];
         const tbody = document.getElementById('resultBody');
         tbody.innerHTML = '';
 
         if (!currentSearchResults || currentSearchResults.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger">查無相關藥品資料</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger" id="initialText">${t.notFound}</td></tr>`;
             return;
         }
 
@@ -173,8 +298,8 @@
                     <td>${item.spec}</td>
                     <td>${item.note}</td>
                     <td>
-                        <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="editChemical(${index})">編輯</button>
-                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteChemical('${item.barcode}')">刪除</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="editChemical(${index})">${t.btnEdit}</button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteChemical('${item.barcode}')">${t.btnDelete}</button>
                     </td>
                 </tr>
             `;
@@ -196,18 +321,20 @@
     }
 
     async function deleteChemical(barcode) {
-        if (!confirm('確定要刪除這筆藥品資料嗎？')) return;
+        const t = dict[currentLang];
+        if (!confirm(t.confirmDelete)) return;
 
         try {
             const res = await fetch('/api/delete_chemical/' + encodeURIComponent(barcode), { method: 'DELETE' });
             if (res.ok) searchChemical();
         } catch (err) {
-            alert('刪除失敗');
+            alert(t.connFail);
         }
     }
 
     async function addChemical(e) {
         e.preventDefault();
+        const t = dict[currentLang];
         const barcodeInput = document.getElementById('addBarcode').value.trim();
         const nameInput = document.getElementById('addName').value.trim();
 
@@ -230,19 +357,20 @@
             });
 
             if (res.ok) {
-                alert('儲存成功！');
+                alert(t.saveSuccess);
                 document.getElementById('searchInput').value = barcodeInput;
                 document.getElementById('addForm').reset();
                 searchChemical();
             } else {
-                alert('儲存失敗');
+                alert(t.saveFail);
             }
         } catch (err) {
-            alert('連線失敗：' + err.message);
+            alert(t.connFail + err.message);
         }
     }
 
     function toggleScanner() {
+        const t = dict[currentLang];
         if (!isScanning) {
             document.getElementById('reader').style.display = 'block';
             html5QrCode = new Html5Qrcode("reader");
@@ -256,14 +384,14 @@
                 },
                 (errorMessage) => {}
             );
-            document.getElementById('btnScan').innerText = "關閉相機";
+            document.getElementById('btnScan').innerText = t.btnScanClose;
             document.getElementById('btnScan').classList.replace('btn-primary', 'btn-danger');
             isScanning = true;
         } else {
             if (html5QrCode) {
                 html5QrCode.stop().then(() => {
                     document.getElementById('reader').style.display = 'none';
-                    document.getElementById('btnScan').innerText = "開啟相機掃描";
+                    document.getElementById('btnScan').innerText = t.btnScanOpen;
                     document.getElementById('btnScan').classList.replace('btn-danger', 'btn-primary');
                     isScanning = false;
                 });

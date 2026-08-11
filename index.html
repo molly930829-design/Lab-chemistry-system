@@ -8,33 +8,31 @@
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body { background-color: #f8f9fa; padding: 20px; }
-        .container { max-width: 900px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        #reader { width: 100%; max-width: 500px; margin: 0 auto; display: none; }
+        .container { max-width: 1000px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #reader { width: 100%; max-width: 400px; margin: 0 auto; display: none; }
         .lang-btn { position: absolute; top: 20px; right: 20px; }
     </style>
 </head>
 <body>
 
 <div class="container position-relative">
-    <!-- 語言切換按鈕 -->
     <button class="btn btn-outline-secondary lang-btn btn-sm" onclick="toggleLanguage()" id="langBtn">English</button>
-
-    <h2 class="text-center mb-4" id="title">🧪 實驗室藥品檔案管理系統</h2>
+    <h2 class="text-center mb-4" id="title">🧪 實驗室藥品精密管理系統</h2>
 
     <!-- 相機掃描區 -->
     <div class="card mb-4">
-        <div class="card-header bg-primary text-white" id="scanHeader">相機掃描條碼</div>
+        <div class="card-header bg-primary text-white fw-bold" id="scanHeader">相機條碼掃描</div>
         <div class="card-body text-center">
-            <button class="btn btn-primary w-100 mb-3" onclick="toggleScanner()" id="btnScan">開啟相機掃描</button>
+            <button class="btn btn-primary w-100 mb-2" onclick="toggleScanner()" id="btnScan">開啟相機掃描</button>
             <div id="reader"></div>
         </div>
     </div>
 
-    <!-- 搜尋區 -->
+    <!-- 模糊搜尋區 -->
     <div class="mb-4">
-        <label for="searchInput" class="form-label fw-bold" id="searchLabel">搜尋藥品或刷條碼 (支援名稱、位置、條碼)</label>
+        <label for="searchInput" class="form-label fw-bold" id="searchLabel">🔍 藥品搜尋 (支援名稱模糊搜尋、CAS No.、SMILES 結構式、條碼、擺放位置)</label>
         <div class="input-group">
-            <input type="text" id="searchInput" class="form-control" placeholder="請刷條碼或輸入藥品名稱/位置..." onkeypress="handleKeyPress(event)">
+            <input type="text" id="searchInput" class="form-control" placeholder="輸入關鍵字如：butyl, 109-60-4, CC(=O)OC, A-1..." onkeypress="handleKeyPress(event)">
             <button class="btn btn-dark" onclick="searchChemical()" id="btnSearch">搜尋</button>
         </div>
     </div>
@@ -42,19 +40,21 @@
     <!-- 查詢結果表格 -->
     <h4 id="resultHeader">查詢結果</h4>
     <div class="table-responsive mb-4">
-        <table class="table table-bordered table-hover">
+        <table class="table table-bordered table-hover align-middle">
             <thead class="table-light">
                 <tr>
                     <th id="thBarcode">條碼</th>
                     <th id="thName">藥品名稱</th>
+                    <th id="thCas">CAS No.</th>
+                    <th id="thSmiles">SMILES 結構式</th>
                     <th id="thSafety">安衛分類</th>
-                    <th id="thLocation">擺放位置座標</th>
+                    <th id="thLocation">位置座標</th>
                     <th id="thSpec">規格</th>
                     <th id="thNote">備註</th>
                 </tr>
             </thead>
             <tbody id="resultBody">
-                <tr><td colspan="6" class="text-center text-muted" id="noData">請輸入關鍵字或刷條碼查詢</td></tr>
+                <tr><td colspan="8" class="text-center text-muted" id="noData">請輸入關鍵字進行模糊搜尋</td></tr>
             </tbody>
         </table>
     </div>
@@ -65,32 +65,63 @@
     <h4 class="mb-3" id="addHeader">➕ 新增藥品建檔</h4>
     <form id="addForm" onsubmit="addChemical(event)">
         <div class="row g-3">
-            <div class="col-md-6">
-                <label class="form-label" id="lblAddBarcode">瓶身條碼 *</label>
+            <div class="col-md-4">
+                <label class="form-label fw-bold" id="lblAddBarcode">瓶身條碼 *</label>
                 <input type="text" id="addBarcode" class="form-control" placeholder="例如：CHEM-00101" required>
             </div>
+            <div class="col-md-4">
+                <label class="form-label fw-bold" id="lblAddName">藥品名稱 *</label>
+                <input type="text" id="addName" class="form-control" placeholder="例如：tert-Butyl acetate" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-bold" id="lblAddCas">CAS Number</label>
+                <input type="text" id="addCas" class="form-control" placeholder="例如：540-88-5">
+            </div>
+
             <div class="col-md-6">
-                <label class="form-label" id="lblAddName">藥品名稱 *</label>
-                <input type="text" id="addName" class="form-control" placeholder="例如：Acetone (丙酮)" required>
+                <label class="form-label fw-bold" id="lblAddSmiles">SMILES 結構式</label>
+                <input type="text" id="addSmiles" class="form-control" placeholder="例如：CC(C)(C)OC(=O)C">
             </div>
-            <div class="col-md-4">
-                <label class="form-label" id="lblAddSafety">安衛分類</label>
-                <input type="text" id="addSafety" class="form-control" placeholder="例如：易燃液體">
+
+            <!-- 下拉選單：安全衛生分類 -->
+            <div class="col-md-3">
+                <label class="form-label fw-bold" id="lblAddSafety">安衛分類 *</label>
+                <select id="addSafety" class="form-select" required>
+                    <option value="">-- 請選擇分類 --</option>
+                    <option value="一般藥品">一般藥品 (General)</option>
+                    <option value="易燃液體">易燃液體 (Flammable)</option>
+                    <option value="毒性物質">毒性物質 (Toxic)</option>
+                    <option value="腐蝕性物質">腐蝕性物質 (Corrosive)</option>
+                    <option value="強氧化劑">強氧化劑 (Oxidizer)</option>
+                    <option value="禁水性物質">禁水性物質 (Water-reactive)</option>
+                </select>
             </div>
-            <div class="col-md-4">
-                <label class="form-label" id="lblAddLocation">擺放位置座標</label>
-                <input type="text" id="addLocation" class="form-control" placeholder="例如：櫃A-3">
+
+            <!-- 下拉選單：擺放位置座標 -->
+            <div class="col-md-3">
+                <label class="form-label fw-bold" id="lblAddLocation">擺放位置座標 *</label>
+                <select id="addLocation" class="form-select" required>
+                    <option value="">-- 請選擇位置 --</option>
+                    <option value="防爆櫃 A-1">防爆櫃 A-1</option>
+                    <option value="防爆櫃 A-2">防爆櫃 A-2</option>
+                    <option value="藥品櫃 B-1">藥品櫃 B-1</option>
+                    <option value="藥品櫃 B-2">藥品櫃 B-2</option>
+                    <option value="酸鹼櫃 C-1">酸鹼櫃 C-1</option>
+                    <option value="冷藏冰箱 R-1">冷藏冰箱 R-1</option>
+                    <option value="冷凍冰箱 F-1">冷凍冰箱 F-1</option>
+                </select>
             </div>
-            <div class="col-md-4">
-                <label class="form-label" id="lblAddSpec">規格</label>
-                <input type="text" id="addSpec" class="form-control" placeholder="例如：500mL / 99.5%">
+
+            <div class="col-md-6">
+                <label class="form-label" id="lblAddSpec">規格 / 純度</label>
+                <input type="text" id="addSpec" class="form-control" placeholder="例如：500mL / 99%">
             </div>
-            <div class="col-12">
+            <div class="col-md-6">
                 <label class="form-label" id="lblAddNote">備註</label>
-                <input type="text" id="addNote" class="form-control" placeholder="備註事項...">
+                <input type="text" id="addNote" class="form-control" placeholder="例如：開瓶日期、保管人...">
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-success w-100" id="btnSubmit">儲存建檔</button>
+                <button type="submit" class="btn btn-success w-100 fw-bold" id="btnSubmit">儲存建檔</button>
             </div>
         </div>
     </form>
@@ -101,28 +132,32 @@
     const dict = {
         zh: {
             langBtn: "English",
-            title: "🧪 實驗室藥品檔案管理系統",
-            scanHeader: "相機掃描條碼",
+            title: "🧪 實驗室藥品精密管理系統",
+            scanHeader: "相機條碼掃描",
             btnScanOpen: "開啟相機掃描",
             btnScanClose: "關閉相機",
-            searchLabel: "搜尋藥品或刷條碼 (支援名稱、位置、條碼)",
-            searchPlaceholder: "請刷條碼或輸入藥品名稱/位置...",
+            searchLabel: "🔍 藥品搜尋 (支援名稱模糊搜尋、CAS No.、SMILES 結構式、條碼、擺放位置)",
+            searchPlaceholder: "輸入關鍵字如：butyl, 109-60-4, CC(=O)OC, A-1...",
             btnSearch: "搜尋",
             resultHeader: "查詢結果",
             thBarcode: "條碼",
             thName: "藥品名稱",
+            thCas: "CAS No.",
+            thSmiles: "SMILES 結構式",
             thSafety: "安衛分類",
-            thLocation: "擺放位置座標",
+            thLocation: "位置座標",
             thSpec: "規格",
             thNote: "備註",
-            noData: "請輸入關鍵字或刷條碼查詢",
-            notFound: "查無此藥品資料",
+            noData: "請輸入關鍵字進行模糊搜尋",
+            notFound: "查無相關藥品資料",
             addHeader: "➕ 新增藥品建檔",
             lblAddBarcode: "瓶身條碼 *",
             lblAddName: "藥品名稱 *",
-            lblAddSafety: "安衛分類",
-            lblAddLocation: "擺放位置座標",
-            lblAddSpec: "規格",
+            lblAddCas: "CAS Number",
+            lblAddSmiles: "SMILES 結構式",
+            lblAddSafety: "安衛分類 *",
+            lblAddLocation: "擺放位置座標 *",
+            lblAddSpec: "規格 / 純度",
             lblAddNote: "備註",
             btnSubmit: "儲存建檔",
             saveSuccess: "建檔成功！",
@@ -130,28 +165,32 @@
         },
         en: {
             langBtn: "中文",
-            title: "🧪 Lab Chemical Management System",
+            title: "🧪 Precision Lab Chemical Management System",
             scanHeader: "Barcode Scanner",
             btnScanOpen: "Start Camera Scan",
             btnScanClose: "Close Camera",
-            searchLabel: "Search Chemical or Scan Barcode (Name, Location, Barcode)",
-            searchPlaceholder: "Scan barcode or enter name/location...",
+            searchLabel: "🔍 Chemical Search (Fuzzy Name, CAS No., SMILES, Barcode, Location)",
+            searchPlaceholder: "Type keywords e.g. butyl, 109-60-4, CC(=O)OC...",
             btnSearch: "Search",
             resultHeader: "Search Results",
             thBarcode: "Barcode",
             thName: "Chemical Name",
+            thCas: "CAS No.",
+            thSmiles: "SMILES",
             thSafety: "Safety Class",
             thLocation: "Location",
             thSpec: "Spec",
             thNote: "Note",
-            noData: "Enter keywords or scan barcode to search",
-            notFound: "No chemical found",
+            noData: "Enter keywords to perform fuzzy search",
+            notFound: "No matching chemical found",
             addHeader: "➕ Add New Chemical",
             lblAddBarcode: "Bottle Barcode *",
             lblAddName: "Chemical Name *",
-            lblAddSafety: "Safety Class",
-            lblAddLocation: "Location",
-            lblAddSpec: "Specification",
+            lblAddCas: "CAS Number",
+            lblAddSmiles: "SMILES Structure",
+            lblAddSafety: "Safety Class *",
+            lblAddLocation: "Location *",
+            lblAddSpec: "Spec / Purity",
             lblAddNote: "Note",
             btnSubmit: "Save Chemical",
             saveSuccess: "Saved successfully!",
@@ -173,6 +212,8 @@
         document.getElementById('resultHeader').innerText = t.resultHeader;
         document.getElementById('thBarcode').innerText = t.thBarcode;
         document.getElementById('thName').innerText = t.thName;
+        document.getElementById('thCas').innerText = t.thCas;
+        document.getElementById('thSmiles').innerText = t.thSmiles;
         document.getElementById('thSafety').innerText = t.thSafety;
         document.getElementById('thLocation').innerText = t.thLocation;
         document.getElementById('thSpec').innerText = t.thSpec;
@@ -180,6 +221,8 @@
         document.getElementById('addHeader').innerText = t.addHeader;
         document.getElementById('lblAddBarcode').innerText = t.lblAddBarcode;
         document.getElementById('lblAddName').innerText = t.lblAddName;
+        document.getElementById('lblAddCas').innerText = t.lblAddCas;
+        document.getElementById('lblAddSmiles').innerText = t.lblAddSmiles;
         document.getElementById('lblAddSafety').innerText = t.lblAddSafety;
         document.getElementById('lblAddLocation').innerText = t.lblAddLocation;
         document.getElementById('lblAddSpec').innerText = t.lblAddSpec;
@@ -238,7 +281,7 @@
         tbody.innerHTML = '';
 
         if (data.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">${t.notFound}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">${t.notFound}</td></tr>`;
             return;
         }
 
@@ -247,10 +290,12 @@
                 <tr>
                     <td><code>${item.barcode}</code></td>
                     <td><b>${item.name}</b></td>
-                    <td>${item.safety_class || '-'}</td>
-                    <td>${item.location || '-'}</td>
-                    <td>${item.spec || '-'}</td>
-                    <td>${item.note || '-'}</td>
+                    <td>${item.cas_no}</td>
+                    <td><code>${item.smiles}</code></td>
+                    <td><span class="badge bg-warning text-dark">${item.safety_class}</span></td>
+                    <td><span class="badge bg-info text-dark">${item.location}</span></td>
+                    <td>${item.spec}</td>
+                    <td>${item.note}</td>
                 </tr>
             `;
         });
@@ -262,8 +307,10 @@
         const payload = {
             barcode: document.getElementById('addBarcode').value.trim(),
             name: document.getElementById('addName').value.trim(),
-            safety_class: document.getElementById('addSafety').value.trim(),
-            location: document.getElementById('addLocation').value.trim(),
+            cas_no: document.getElementById('addCas').value.trim(),
+            smiles: document.getElementById('addSmiles').value.trim(),
+            safety_class: document.getElementById('addSafety').value,
+            location: document.getElementById('addLocation').value,
             spec: document.getElementById('addSpec').value.trim(),
             note: document.getElementById('addNote').value.trim()
         };

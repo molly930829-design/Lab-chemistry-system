@@ -1,31 +1,25 @@
-# main.py
-import sqlite3
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Query
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+import sqlite3
 
-app = FastAPI(title="實驗室藥品管理系統")
+app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
+# 初始化資料庫表格（自動新增 cas_no 與 smiles 欄位）
 def init_db():
     conn = sqlite3.connect("lab_chemicals.db")
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS chemicals (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            barcode TEXT UNIQUE NOT NULL,
+            barcode TEXT PRIMARY KEY,
             name TEXT NOT NULL,
-            safety_class TEXT NOT NULL,
-            location_id TEXT NOT NULL,
-            capacity TEXT,
+            cas_no TEXT,
+            smiles TEXT,
+            safety_class TEXT,
+            location TEXT,
+            spec TEXT,
             note TEXT
         )
     """)
@@ -34,55 +28,72 @@ def init_db():
 
 init_db()
 
-class ChemicalCreate(BaseModel):
+# 藥品資料結構
+class Chemical(BaseModel):
     barcode: str
     name: str
-    safety_class: str
-    location_id: str
-    capacity: Optional[str] = ""
-    note: Optional[str] = ""
+    cas_no: Optional[str] = None
+    smiles: Optional[str] = None
+    safety_class: Optional[str] = None
+    location: Optional[str] = None
+    spec: Optional[str] = None
+    note: Optional[str] = None
 
-# 讓手機直接輸入 IP 就能載入網頁畫面
+# 提供靜態首頁
 @app.get("/")
-def read_index():
+def read_root():
     return FileResponse("index.html")
 
-@app.post("/api/chemicals")
-def add_chemical(chem: ChemicalCreate):
+# 模糊搜尋 API (支援 條碼/名稱/CAS/SMILES/位置/安衛)
+@app.get("/api/search")
+def search_chemical(q: str = Query(..., min_length=1)):
     conn = sqlite3.connect("lab_chemicals.db")
     cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "INSERT INTO chemicals (barcode, name, safety_class, location_id, capacity, note) VALUES (?, ?, ?, ?, ?, ?)",
-            (chem.barcode, chem.name, chem.safety_class, chem.location_id, chem.capacity, chem.note)
-        )
-        conn.commit()
-        return {"status": "success", "message": "藥品建檔成功！"}
-    except sqlite3.IntegrityError:
-        raise HTTPException(status_code=400, detail="條碼號碼已存在，不可重複建檔！")
-    finally:
-        conn.close()
-
-@app.get("/api/chemicals/search")
-def search_chemical(q: str):
-    conn = sqlite3.connect("lab_chemicals.db")
-    cursor = conn.cursor()
+    
+    # 使用 % 實現模糊搜尋（例如輸入 butyl 會匹配 tert-butyl acetate）
+    keyword = f"%{q.strip()}%"
+    
     cursor.execute("""
-        SELECT barcode, name, safety_class, location_id, capacity, note 
+        SELECT barcode, name, cas_no, smiles, safety_class, location, spec, note 
         FROM chemicals 
-        WHERE barcode LIKE ? OR name LIKE ? OR location_id LIKE ? OR safety_class LIKE ?
-    """, (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"))
+        WHERE barcode LIKE ? 
+           OR name LIKE ? 
+           OR cas_no LIKE ? 
+           OR smiles LIKE ? 
+           OR location LIKE ? 
+           OR safety_class LIKE ?
+    """, (keyword, keyword, keyword, keyword, keyword, keyword))
+    
     rows = cursor.fetchall()
     conn.close()
     
     results = []
-    for r in rows:
+    for row in rows:
         results.append({
-            "barcode": r[0],
-            "name": r[1],
-            "safety_class": r[2],
-            "location_id": r[3],
-            "capacity": r[4],
-            "note": r[5]
+            "barcode": row[0],
+            "name": row[1],
+            "cas_no": row[2] or "-",
+            "smiles": row[3] or "-",
+            "safety_class": row[4] or "-",
+            "location": row[5] or "-",
+            "spec": row[6] or "-",
+            "note": row[7] or "-"
         })
-    return {"results": results}
+    return results
+
+# 新增藥品 API
+@app.post("/api/add_chemical")
+def add_chemical(chem: Chemical):
+    conn = sqlite3.connect("lab_chemicals.db")
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO chemicals (barcode, name, cas_no, smiles, safety_class, location, spec, note)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (chem.barcode, chem.name, chem.cas_no, chem.smiles, chem.safety_class, chem.location, chem.spec, chem.note))
+        conn.commit()
+        conn.close()
+        return {"status": "success"}
+    except sqlite3.IntegrityError:
+        conn.close()
+        return {"status": "error", "message": "條碼已存在"}

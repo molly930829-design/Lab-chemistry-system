@@ -242,7 +242,6 @@
         const noDataElem = document.getElementById('noData');
         if (noDataElem) noDataElem.innerText = t.noData;
         
-        // 重新渲染當前搜尋結果以切換按鈕文字
         renderResults();
     }
 
@@ -334,7 +333,6 @@
         document.getElementById('addSpec').value = item.spec === '-' ? '' : item.spec;
         document.getElementById('addNote').value = item.note === '-' ? '' : item.note;
         
-        // 移動平滑滾動至編輯表單
         document.getElementById('addForm').scrollIntoView({ behavior: 'smooth' });
     }
 
@@ -347,16 +345,19 @@
         });
 
         if (res.ok) {
-            searchChemical(); // 重新整理表格
+            searchChemical();
         }
     }
 
     async function addChemical(e) {
         e.preventDefault();
         const t = dict[currentLang];
+        const barcodeInput = document.getElementById('addBarcode').value.trim();
+        const nameInput = document.getElementById('addName').value.trim();
+
         const payload = {
-            barcode: document.getElementById('addBarcode').value.trim(),
-            name: document.getElementById('addName').value.trim(),
+            barcode: barcodeInput,
+            name: nameInput,
             cas_no: document.getElementById('addCas').value.trim(),
             smiles: document.getElementById('addSmiles').value.trim(),
             safety_class: document.getElementById('addSafety').value,
@@ -373,8 +374,14 @@
 
         if (res.ok) {
             alert(t.saveSuccess);
+            
+            // 自動將新增的藥品名稱帶入搜尋框並立即查詢
+            document.getElementById('searchInput').value = barcodeInput;
             document.getElementById('addForm').reset();
-            searchChemical(); // 重新整理查詢列表
+            
+            // 執行搜尋並滾動至結果區
+            await searchChemical();
+            document.getElementById('resultHeader').scrollIntoView({ behavior: 'smooth' });
         } else {
             alert(t.saveFail);
         }

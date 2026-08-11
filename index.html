@@ -8,7 +8,7 @@
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body { background-color: #f8f9fa; padding: 20px; }
-        .container { max-width: 1000px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .container { max-width: 1100px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         #reader { width: 100%; max-width: 400px; margin: 0 auto; display: none; }
         .lang-btn { position: absolute; top: 20px; right: 20px; }
     </style>
@@ -51,18 +51,19 @@
                     <th id="thLocation">位置座標</th>
                     <th id="thSpec">規格</th>
                     <th id="thNote">備註</th>
+                    <th id="thAction">操作</th>
                 </tr>
             </thead>
             <tbody id="resultBody">
-                <tr><td colspan="8" class="text-center text-muted" id="noData">請輸入關鍵字進行模糊搜尋</td></tr>
+                <tr><td colspan="9" class="text-center text-muted" id="noData">請輸入關鍵字進行模糊搜尋</td></tr>
             </tbody>
         </table>
     </div>
 
     <hr>
 
-    <!-- 新增藥品建檔 -->
-    <h4 class="mb-3" id="addHeader">➕ 新增藥品建檔</h4>
+    <!-- 新增 / 修改藥品建檔 -->
+    <h4 class="mb-3" id="addHeader">➕ 新增 / 修改藥品建檔</h4>
     <form id="addForm" onsubmit="addChemical(event)">
         <div class="row g-3">
             <div class="col-md-4">
@@ -83,7 +84,6 @@
                 <input type="text" id="addSmiles" class="form-control" placeholder="例如：CC(C)(C)OC(=O)C">
             </div>
 
-            <!-- 下拉選單：安全衛生分類 -->
             <div class="col-md-3">
                 <label class="form-label fw-bold" id="lblAddSafety">安衛分類 *</label>
                 <select id="addSafety" class="form-select" required>
@@ -97,7 +97,6 @@
                 </select>
             </div>
 
-            <!-- 下拉選單：擺放位置座標 -->
             <div class="col-md-3">
                 <label class="form-label fw-bold" id="lblAddLocation">擺放位置座標 *</label>
                 <select id="addLocation" class="form-select" required>
@@ -121,7 +120,7 @@
                 <input type="text" id="addNote" class="form-control" placeholder="例如：開瓶日期、保管人...">
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-success w-100 fw-bold" id="btnSubmit">儲存建檔</button>
+                <button type="submit" class="btn btn-success w-100 fw-bold" id="btnSubmit">儲存建檔 / 更新資料</button>
             </div>
         </div>
     </form>
@@ -129,6 +128,8 @@
 
 <script>
     let currentLang = 'zh';
+    let currentSearchResults = [];
+
     const dict = {
         zh: {
             langBtn: "English",
@@ -148,9 +149,10 @@
             thLocation: "位置座標",
             thSpec: "規格",
             thNote: "備註",
+            thAction: "操作",
             noData: "請輸入關鍵字進行模糊搜尋",
             notFound: "查無相關藥品資料",
-            addHeader: "➕ 新增藥品建檔",
+            addHeader: "➕ 新增 / 修改藥品建檔",
             lblAddBarcode: "瓶身條碼 *",
             lblAddName: "藥品名稱 *",
             lblAddCas: "CAS Number",
@@ -159,9 +161,12 @@
             lblAddLocation: "擺放位置座標 *",
             lblAddSpec: "規格 / 純度",
             lblAddNote: "備註",
-            btnSubmit: "儲存建檔",
-            saveSuccess: "建檔成功！",
-            saveFail: "建檔失敗，條碼可能重複了。"
+            btnSubmit: "儲存建檔 / 更新資料",
+            btnEdit: "編輯",
+            btnDelete: "刪除",
+            confirmDelete: "確定要刪除這筆藥品資料嗎？",
+            saveSuccess: "儲存成功！",
+            saveFail: "儲存失敗。"
         },
         en: {
             langBtn: "中文",
@@ -181,9 +186,10 @@
             thLocation: "Location",
             thSpec: "Spec",
             thNote: "Note",
+            thAction: "Action",
             noData: "Enter keywords to perform fuzzy search",
             notFound: "No matching chemical found",
-            addHeader: "➕ Add New Chemical",
+            addHeader: "➕ Add / Edit Chemical",
             lblAddBarcode: "Bottle Barcode *",
             lblAddName: "Chemical Name *",
             lblAddCas: "CAS Number",
@@ -192,9 +198,12 @@
             lblAddLocation: "Location *",
             lblAddSpec: "Spec / Purity",
             lblAddNote: "Note",
-            btnSubmit: "Save Chemical",
+            btnSubmit: "Save / Update Chemical",
+            btnEdit: "Edit",
+            btnDelete: "Delete",
+            confirmDelete: "Are you sure you want to delete this chemical?",
             saveSuccess: "Saved successfully!",
-            saveFail: "Failed to save. Barcode might already exist."
+            saveFail: "Failed to save."
         }
     };
 
@@ -218,6 +227,7 @@
         document.getElementById('thLocation').innerText = t.thLocation;
         document.getElementById('thSpec').innerText = t.thSpec;
         document.getElementById('thNote').innerText = t.thNote;
+        document.getElementById('thAction').innerText = t.thAction;
         document.getElementById('addHeader').innerText = t.addHeader;
         document.getElementById('lblAddBarcode').innerText = t.lblAddBarcode;
         document.getElementById('lblAddName').innerText = t.lblAddName;
@@ -231,6 +241,9 @@
 
         const noDataElem = document.getElementById('noData');
         if (noDataElem) noDataElem.innerText = t.noData;
+        
+        // 重新渲染當前搜尋結果以切換按鈕文字
+        renderResults();
     }
 
     let html5QrCode;
@@ -276,16 +289,21 @@
         if (!query) return;
 
         const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-        const data = await res.json();
+        currentSearchResults = await res.json();
+        renderResults();
+    }
+
+    function renderResults() {
+        const t = dict[currentLang];
         const tbody = document.getElementById('resultBody');
         tbody.innerHTML = '';
 
-        if (data.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">${t.notFound}</td></tr>`;
+        if (currentSearchResults.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger">${t.notFound}</td></tr>`;
             return;
         }
 
-        data.forEach(item => {
+        currentSearchResults.forEach((item, index) => {
             tbody.innerHTML += `
                 <tr>
                     <td><code>${item.barcode}</code></td>
@@ -296,9 +314,41 @@
                     <td><span class="badge bg-info text-dark">${item.location}</span></td>
                     <td>${item.spec}</td>
                     <td>${item.note}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editChemical(${index})">${t.btnEdit}</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteChemical('${item.barcode}')">${t.btnDelete}</button>
+                    </td>
                 </tr>
             `;
         });
+    }
+
+    function editChemical(index) {
+        const item = currentSearchResults[index];
+        document.getElementById('addBarcode').value = item.barcode;
+        document.getElementById('addName').value = item.name;
+        document.getElementById('addCas').value = item.cas_no === '-' ? '' : item.cas_no;
+        document.getElementById('addSmiles').value = item.smiles === '-' ? '' : item.smiles;
+        document.getElementById('addSafety').value = item.safety_class === '-' ? '' : item.safety_class;
+        document.getElementById('addLocation').value = item.location === '-' ? '' : item.location;
+        document.getElementById('addSpec').value = item.spec === '-' ? '' : item.spec;
+        document.getElementById('addNote').value = item.note === '-' ? '' : item.note;
+        
+        // 移動平滑滾動至編輯表單
+        document.getElementById('addForm').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function deleteChemical(barcode) {
+        const t = dict[currentLang];
+        if (!confirm(t.confirmDelete)) return;
+
+        const res = await fetch(`/api/delete_chemical/${encodeURIComponent(barcode)}`, {
+            method: 'DELETE'
+        });
+
+        if (res.ok) {
+            searchChemical(); // 重新整理表格
+        }
     }
 
     async function addChemical(e) {
@@ -324,6 +374,7 @@
         if (res.ok) {
             alert(t.saveSuccess);
             document.getElementById('addForm').reset();
+            searchChemical(); // 重新整理查詢列表
         } else {
             alert(t.saveFail);
         }

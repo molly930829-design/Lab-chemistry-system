@@ -1,5 +1,4 @@
 from fastapi import FastAPI, Query
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
@@ -7,7 +6,7 @@ import sqlite3
 
 app = FastAPI()
 
-# 初始化資料庫表格（自動新增 cas_no 與 smiles 欄位）
+# 初始化資料庫表格
 def init_db():
     conn = sqlite3.connect("lab_chemicals.db")
     cursor = conn.cursor()
@@ -28,7 +27,6 @@ def init_db():
 
 init_db()
 
-# 藥品資料結構
 class Chemical(BaseModel):
     barcode: str
     name: str
@@ -39,20 +37,16 @@ class Chemical(BaseModel):
     spec: Optional[str] = None
     note: Optional[str] = None
 
-# 提供靜態首頁
 @app.get("/")
 def read_root():
     return FileResponse("index.html")
 
-# 模糊搜尋 API (支援 條碼/名稱/CAS/SMILES/位置/安衛)
+# 模糊搜尋 API
 @app.get("/api/search")
 def search_chemical(q: str = Query(..., min_length=1)):
     conn = sqlite3.connect("lab_chemicals.db")
     cursor = conn.cursor()
-    
-    # 使用 % 實現模糊搜尋（例如輸入 butyl 會匹配 tert-butyl acetate）
     keyword = f"%{q.strip()}%"
-    
     cursor.execute("""
         SELECT barcode, name, cas_no, smiles, safety_class, location, spec, note 
         FROM chemicals 
@@ -81,19 +75,29 @@ def search_chemical(q: str = Query(..., min_length=1)):
         })
     return results
 
-# 新增藥品 API
+# 新增 / 修改藥品 API (使用 REPLACE INTO 支持覆蓋更新)
 @app.post("/api/add_chemical")
 def add_chemical(chem: Chemical):
     conn = sqlite3.connect("lab_chemicals.db")
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            INSERT INTO chemicals (barcode, name, cas_no, smiles, safety_class, location, spec, note)
+            INSERT OR REPLACE INTO chemicals (barcode, name, cas_no, smiles, safety_class, location, spec, note)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (chem.barcode, chem.name, chem.cas_no, chem.smiles, chem.safety_class, chem.location, chem.spec, chem.note))
         conn.commit()
         conn.close()
         return {"status": "success"}
-    except sqlite3.IntegrityError:
+    except Exception as e:
         conn.close()
-        return {"status": "error", "message": "條碼已存在"}
+        return {"status": "error", "message": str(e)}
+
+# 刪除藥品 API
+@app.delete("/api/delete_chemical/{barcode}")
+def delete_chemical(barcode: str):
+    conn = sqlite3.connect("lab_chemicals.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM chemicals WHERE barcode = ?", (barcode,))
+    conn.commit()
+    conn.close()
+    return {"status": "success"}

@@ -6,7 +6,6 @@ import sqlite3
 
 app = FastAPI()
 
-# 初始化資料庫表格
 def init_db():
     conn = sqlite3.connect("lab_chemicals.db")
     cursor = conn.cursor()
@@ -30,33 +29,37 @@ init_db()
 class Chemical(BaseModel):
     barcode: str
     name: str
-    cas_no: Optional[str] = None
-    smiles: Optional[str] = None
-    safety_class: Optional[str] = None
-    location: Optional[str] = None
-    spec: Optional[str] = None
-    note: Optional[str] = None
+    cas_no: Optional[str] = ""
+    smiles: Optional[str] = ""
+    safety_class: Optional[str] = ""
+    location: Optional[str] = ""
+    spec: Optional[str] = ""
+    note: Optional[str] = ""
 
 @app.get("/")
 def read_root():
     return FileResponse("index.html")
 
-# 模糊搜尋 API
 @app.get("/api/search")
-def search_chemical(q: str = Query(..., min_length=1)):
+def search_chemical(q: str = Query("")):
     conn = sqlite3.connect("lab_chemicals.db")
     cursor = conn.cursor()
     keyword = f"%{q.strip()}%"
-    cursor.execute("""
-        SELECT barcode, name, cas_no, smiles, safety_class, location, spec, note 
-        FROM chemicals 
-        WHERE barcode LIKE ? 
-           OR name LIKE ? 
-           OR cas_no LIKE ? 
-           OR smiles LIKE ? 
-           OR location LIKE ? 
-           OR safety_class LIKE ?
-    """, (keyword, keyword, keyword, keyword, keyword, keyword))
+    
+    # 如果搜尋條件空白，就列出前 50 筆資料
+    if not q.strip():
+        cursor.execute("SELECT barcode, name, cas_no, smiles, safety_class, location, spec, note FROM chemicals LIMIT 50")
+    else:
+        cursor.execute("""
+            SELECT barcode, name, cas_no, smiles, safety_class, location, spec, note 
+            FROM chemicals 
+            WHERE barcode LIKE ? 
+               OR name LIKE ? 
+               OR cas_no LIKE ? 
+               OR smiles LIKE ? 
+               OR location LIKE ? 
+               OR safety_class LIKE ?
+        """, (keyword, keyword, keyword, keyword, keyword, keyword))
     
     rows = cursor.fetchall()
     conn.close()
@@ -64,8 +67,8 @@ def search_chemical(q: str = Query(..., min_length=1)):
     results = []
     for row in rows:
         results.append({
-            "barcode": row[0],
-            "name": row[1],
+            "barcode": row[0] or "",
+            "name": row[1] or "",
             "cas_no": row[2] or "-",
             "smiles": row[3] or "-",
             "safety_class": row[4] or "-",
@@ -75,7 +78,6 @@ def search_chemical(q: str = Query(..., min_length=1)):
         })
     return results
 
-# 新增 / 修改藥品 API (使用 REPLACE INTO 支持覆蓋更新)
 @app.post("/api/add_chemical")
 def add_chemical(chem: Chemical):
     conn = sqlite3.connect("lab_chemicals.db")
@@ -92,7 +94,6 @@ def add_chemical(chem: Chemical):
         conn.close()
         return {"status": "error", "message": str(e)}
 
-# 刪除藥品 API
 @app.delete("/api/delete_chemical/{barcode}")
 def delete_chemical(barcode: str):
     conn = sqlite3.connect("lab_chemicals.db")

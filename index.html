@@ -294,7 +294,7 @@
         const rawCas = document.getElementById('addCas').value.trim();
         const btn = document.getElementById('btnFetchCas');
         if (!rawCas) {
-            alert('請先在 CAS Number 欄位輸入號碼！');
+            alert('請先輸入 CAS Number！');
             return;
         }
 
@@ -304,27 +304,33 @@
         const cleanCas = rawCas.replace(/-/g, '').trim();
 
         try {
-            let res = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(rawCas)}/property/Title,IsomericSMILES,CanonicalSMILES/JSON`);
+            const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cleanCas)}/property/Title,CanonicalSMILES,IsomericSMILES/JSON`;
+            const res = await fetch(url);
             
-            if (!res.ok) {
-                res = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cleanCas)}/property/Title,IsomericSMILES,CanonicalSMILES/JSON`);
-            }
-
             if (!res.ok) throw new Error('PubChem 查無此 CAS 資料');
 
             const data = await res.json();
-            const props = data.PropertyTable.Properties[0];
-            const smiles = props.IsomericSMILES || props.CanonicalSMILES;
-            const name = props.Title;
+            
+            if (data && data.PropertyTable && data.PropertyTable.Properties && data.PropertyTable.Properties.length > 0) {
+                const props = data.PropertyTable.Properties[0];
+                const smiles = props.CanonicalSMILES || props.IsomericSMILES || '';
+                const name = props.Title || '';
 
-            if (smiles) {
-                document.getElementById('addSmiles').value = smiles;
-                previewStructure();
+                if (smiles) {
+                    const smilesInput = document.getElementById('addSmiles');
+                    smilesInput.value = smiles;
+                    previewStructure();
+                    alert(`成功帶入結構：${smiles}\n請點擊下方的「儲存建檔 / 更新資料」！`);
+                } else {
+                    alert('PubChem 找到了此藥品，但沒有 SMILES 結構資料。');
+                }
+
+                if (name && !document.getElementById('addName').value.trim()) {
+                    document.getElementById('addName').value = name;
+                }
+            } else {
+                alert('PubChem 解析資料失敗');
             }
-            if (name && !document.getElementById('addName').value.trim()) {
-                document.getElementById('addName').value = name;
-            }
-            alert('成功自動帶入化學結構與名稱！');
         } catch (err) {
             alert('檢索失敗：' + err.message);
         } finally {

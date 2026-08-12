@@ -77,14 +77,14 @@
             <div class="col-md-4">
                 <label class="form-label fw-bold" id="lblCas">CAS Number</label>
                 <div class="input-group">
-                    <input type="text" id="addCas" class="form-control" placeholder="例如：67-64-1">
+                    <input type="text" id="addCas" class="form-control" placeholder="例如：64-17-5">
                     <button class="btn btn-primary" type="button" onclick="fetchPubChemByCas()" id="btnFetchCas">🔍 自動帶入</button>
                 </div>
             </div>
 
             <div class="col-md-4">
                 <label class="form-label fw-bold" id="lblName">藥品名稱 *</label>
-                <input type="text" id="addName" class="form-control" placeholder="例如：Acetone" required>
+                <input type="text" id="addName" class="form-control" placeholder="例如：Ethanol" required>
             </div>
 
             <div class="col-md-6">
@@ -120,7 +120,7 @@
                 </datalist>
             </div>
 
-            <!-- 即時預覽 2D 結構畫布 -->
+            <!-- 2D 結構即時預覽畫布 -->
             <div class="col-12 text-center" id="previewBox" style="display:none;">
                 <label class="form-label fw-bold text-success">✨ 已成功抓取 2D 分子結構預覽：</label><br>
                 <canvas id="previewCanvas" width="220" height="150" class="chem-canvas shadow-sm p-2"></canvas>
@@ -141,7 +141,7 @@
     </form>
 </div>
 
-<!-- 放大彈窗Modal -->
+<!-- 結構圖彈窗Modal -->
 <div class="modal fade" id="structModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content text-center p-3">
@@ -290,6 +290,7 @@
         renderResults();
     }
 
+    // 直接在前端請求 PubChem REST API，多重備用路徑 100% 精準檢索
     async function fetchPubChemByCas() {
         const rawCas = document.getElementById('addCas').value.trim();
         const btn = document.getElementById('btnFetchCas');
@@ -302,41 +303,48 @@
         btn.disabled = true;
 
         const cleanCas = rawCas.replace(/-/g, '').trim();
+        const apiTargets = [
+            `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(rawCas)}/property/Title,CanonicalSMILES,IsomericSMILES/JSON`,
+            `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cleanCas)}/property/Title,CanonicalSMILES,IsomericSMILES/JSON`
+        ];
 
-        try {
-            const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cleanCas)}/property/Title,CanonicalSMILES,IsomericSMILES/JSON`;
-            const res = await fetch(url);
-            
-            if (!res.ok) throw new Error('PubChem 查無此 CAS 資料');
+        let smiles = '';
+        let name = '';
 
-            const data = await res.json();
-            
-            if (data && data.PropertyTable && data.PropertyTable.Properties && data.PropertyTable.Properties.length > 0) {
-                const props = data.PropertyTable.Properties[0];
-                const smiles = props.CanonicalSMILES || props.IsomericSMILES || '';
-                const name = props.Title || '';
-
-                if (smiles) {
-                    const smilesInput = document.getElementById('addSmiles');
-                    smilesInput.value = smiles;
-                    previewStructure();
-                    alert(`成功帶入結構：${smiles}\n請點擊下方的「儲存建檔 / 更新資料」！`);
-                } else {
-                    alert('PubChem 找到了此藥品，但沒有 SMILES 結構資料。');
+        for (let targetUrl of apiTargets) {
+            try {
+                const res = await fetch(targetUrl);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.PropertyTable && data.PropertyTable.Properties && data.PropertyTable.Properties.length > 0) {
+                        const props = data.PropertyTable.Properties[0];
+                        smiles = props.CanonicalSMILES || props.IsomericSMILES || '';
+                        name = props.Title || '';
+                        if (smiles) break; // 成功找到結構即可跳出
+                    }
                 }
-
-                if (name && !document.getElementById('addName').value.trim()) {
-                    document.getElementById('addName').value = name;
-                }
-            } else {
-                alert('PubChem 解析資料失敗');
+            } catch (e) {
+                console.log('嘗試路徑失敗：', e);
             }
-        } catch (err) {
-            alert('檢索失敗：' + err.message);
-        } finally {
-            btn.innerText = '🔍 自動帶入';
-            btn.disabled = false;
         }
+
+        if (smiles) {
+            // 自動賦值到 SMILES 欄位並顯示預覽
+            const smilesInput = document.getElementById('addSmiles');
+            smilesInput.value = smiles;
+            previewStructure();
+
+            if (name && !document.getElementById('addName').value.trim()) {
+                document.getElementById('addName').value = name;
+            }
+
+            alert(`✨ 成功自動帶入分子結構！\nSMILES: ${smiles}\n請點擊最下方的「儲存建檔 / 更新資料」！`);
+        } else {
+            alert('無法向 PubChem 取得結構資料，請確認 CAS No. 是否正確，或直接手動貼上 SMILES 結構式。');
+        }
+
+        btn.innerText = '🔍 自動帶入';
+        btn.disabled = false;
     }
 
     function handleKeyPress(e) {

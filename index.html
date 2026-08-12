@@ -290,7 +290,7 @@
         renderResults();
     }
 
-    // 直接在前端請求 PubChem REST API，多重備用路徑 100% 精準檢索
+    // 兩階段 PubChem CAS 檢索：先用 CAS 轉 CID，再用 CID 精準抓取 SMILES 與英文名稱
     async function fetchPubChemByCas() {
         const rawCas = document.getElementById('addCas').value.trim();
         const btn = document.getElementById('btnFetchCas');
@@ -302,49 +302,45 @@
         btn.innerText = '⏳ 檢索中...';
         btn.disabled = true;
 
-        const cleanCas = rawCas.replace(/-/g, '').trim();
-        const apiTargets = [
-            `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(rawCas)}/property/Title,CanonicalSMILES,IsomericSMILES/JSON`,
-            `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cleanCas)}/property/Title,CanonicalSMILES,IsomericSMILES/JSON`
-        ];
+        try {
+            // 第一階段：查詢 CAS 對應的 PubChem CID
+            const cidUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/substance/name/${encodeURIComponent(rawCas)}/cids/JSON`;
+            const cidRes = await fetch(cidUrl);
+            if (!cidRes.ok) throw new Error('PubChem 同義詞庫查無此 CAS Number');
 
-        let smiles = '';
-        let name = '';
+            const cidData = await cidRes.json();
+            const cid = cidData.IdentifierList && cidData.IdentifierList.CID ? cidData.IdentifierList.CID[0] : null;
 
-        for (let targetUrl of apiTargets) {
-            try {
-                const res = await fetch(targetUrl);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && data.PropertyTable && data.PropertyTable.Properties && data.PropertyTable.Properties.length > 0) {
-                        const props = data.PropertyTable.Properties[0];
-                        smiles = props.CanonicalSMILES || props.IsomericSMILES || '';
-                        name = props.Title || '';
-                        if (smiles) break; // 成功找到結構即可跳出
-                    }
+            if (!cid) throw new Error('無法解析此 CAS No. 對應的 CID');
+
+            // 第二階段：拿 CID 查詢專屬 SMILES 與 Title
+            const propUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/Title,CanonicalSMILES,IsomericSMILES/JSON`;
+            const propRes = await fetch(propUrl);
+            if (!propRes.ok) throw new Error('取得結構失敗');
+
+            const propData = await propRes.json();
+            const props = propData.PropertyTable.Properties[0];
+            const smiles = props.CanonicalSMILES || props.IsomericSMILES || '';
+            const name = props.Title || '';
+
+            if (smiles) {
+                document.getElementById('addSmiles').value = smiles;
+                previewStructure();
+
+                if (name && !document.getElementById('addName').value.trim()) {
+                    document.getElementById('addName').value = name;
                 }
-            } catch (e) {
-                console.log('嘗試路徑失敗：', e);
+
+                alert(`✨ 成功自動帶入分子結構！\nSMILES: ${smiles}\n請點擊最下方的「儲存建檔 / 更新資料」！`);
+            } else {
+                alert('PubChem 找到了此藥品，但該化合物紀錄中無 SMILES 結構。');
             }
+        } catch (err) {
+            alert('檢索失敗：' + err.message + '\n請確認 CAS 號碼是否正確。');
+        } finally {
+            btn.innerText = '🔍 自動帶入';
+            btn.disabled = false;
         }
-
-        if (smiles) {
-            // 自動賦值到 SMILES 欄位並顯示預覽
-            const smilesInput = document.getElementById('addSmiles');
-            smilesInput.value = smiles;
-            previewStructure();
-
-            if (name && !document.getElementById('addName').value.trim()) {
-                document.getElementById('addName').value = name;
-            }
-
-            alert(`✨ 成功自動帶入分子結構！\nSMILES: ${smiles}\n請點擊最下方的「儲存建檔 / 更新資料」！`);
-        } else {
-            alert('無法向 PubChem 取得結構資料，請確認 CAS No. 是否正確，或直接手動貼上 SMILES 結構式。');
-        }
-
-        btn.innerText = '🔍 自動帶入';
-        btn.disabled = false;
     }
 
     function handleKeyPress(e) {
@@ -441,7 +437,7 @@
         box.style.display = 'block';
         SmilesDrawer.parse(smiles, function (tree) {
             let pDrawer = new SmilesDrawer.Drawer({ width: 220, height: 150 });
-            pDrawer.draw(tree, 'previewCanvas', 'light', false);
+            pDrawer.draw(tree, `previewCanvas`, 'light', false);
         });
     }
 

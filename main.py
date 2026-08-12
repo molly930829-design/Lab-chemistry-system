@@ -12,7 +12,8 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 def get_db_connection():
     if DATABASE_URL:
         url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-        return psycopg2.connect(url)
+        # 強制加入 sslmode=require 確保 Render PostgreSQL 正常連線
+        return psycopg2.connect(url, sslmode='require')
     else:
         import sqlite3
         return sqlite3.connect("lab_chemicals.db")

@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from typing import Optional
 import os
 import psycopg2
+import urllib.request
+import json
 
 app = FastAPI()
 
@@ -12,7 +14,6 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 def get_db_connection():
     if DATABASE_URL:
         url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-        # 強制加入 sslmode=require 確保 Render PostgreSQL 正常連線
         return psycopg2.connect(url, sslmode='require')
     else:
         import sqlite3
@@ -72,6 +73,20 @@ class Chemical(BaseModel):
 @app.get("/")
 def read_root():
     return FileResponse("index.html")
+
+@app.get("/api/pubchem/{cas}")
+def fetch_pubchem(cas: str):
+    try:
+        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{cas}/property/Title,IsomericSMILES,CanonicalSMILES/JSON"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read().decode())
+            props = data["PropertyTable"]["Properties"][0]
+            smiles = props.get("IsomericSMILES") or props.get("CanonicalSMILES") or ""
+            name = props.get("Title") or ""
+            return {"status": "success", "smiles": smiles, "name": name}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @app.get("/api/search")
 def search_chemical(q: str = Query("")):

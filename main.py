@@ -74,19 +74,27 @@ class Chemical(BaseModel):
 def read_root():
     return FileResponse("index.html")
 
+# 後端代理 PubChem 查詢 API (自動支援 CAS 號碼檢索)
 @app.get("/api/pubchem/{cas}")
 def fetch_pubchem(cas: str):
-    try:
-        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{cas.strip()}/property/Title,IsomericSMILES,CanonicalSMILES/JSON"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=5) as response:
-            data = json.loads(response.read().decode())
-            props = data["PropertyTable"]["Properties"][0]
-            smiles = props.get("IsomericSMILES") or props.get("CanonicalSMILES") or ""
-            name = props.get("Title") or ""
-            return {"status": "success", "smiles": smiles, "name": name}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    clean_cas = cas.replace("-", "").strip()
+    urls = [
+        f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{cas.strip()}/property/Title,IsomericSMILES,CanonicalSMILES/JSON",
+        f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{clean_cas}/property/Title,IsomericSMILES,CanonicalSMILES/JSON"
+    ]
+    for url in urls:
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=5) as response:
+                data = json.loads(response.read().decode())
+                props = data["PropertyTable"]["Properties"][0]
+                smiles = props.get("IsomericSMILES") or props.get("CanonicalSMILES") or ""
+                name = props.get("Title") or ""
+                if smiles:
+                    return {"status": "success", "smiles": smiles, "name": name}
+        except Exception:
+            continue
+    return {"status": "error", "message": "PubChem 查無此 CAS 資料"}
 
 @app.get("/api/search")
 def search_chemical(q: str = Query("")):

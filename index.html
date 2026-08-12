@@ -78,7 +78,7 @@
                 <label class="form-label fw-bold" id="lblCas">CAS Number</label>
                 <div class="input-group">
                     <input type="text" id="addCas" class="form-control" placeholder="例如：67-64-1">
-                    <button class="btn btn-outline-primary" type="button" onclick="fetchPubChemByCas()" id="btnFetchCas">🔍 自動帶入</button>
+                    <button class="btn btn-primary" type="button" onclick="fetchPubChemByCas()" id="btnFetchCas">🔍 自動帶入結構</button>
                 </div>
             </div>
 
@@ -89,7 +89,7 @@
 
             <div class="col-md-6">
                 <label class="form-label fw-bold" id="lblSmiles">SMILES 結構式</label>
-                <input type="text" id="addSmiles" class="form-control" placeholder="例如：CC(=O)C" oninput="previewStructure()">
+                <input type="text" id="addSmiles" class="form-control" placeholder="輸入 CAS 點擊自動帶入，或手動貼上" oninput="previewStructure()">
             </div>
 
             <div class="col-md-3">
@@ -120,9 +120,10 @@
                 </datalist>
             </div>
 
+            <!-- 即時預覽 2D 結構畫布 -->
             <div class="col-12 text-center" id="previewBox" style="display:none;">
-                <label class="form-label fw-bold text-muted">2D 結構即時預覽：</label><br>
-                <canvas id="previewCanvas" width="180" height="120" class="chem-canvas"></canvas>
+                <label class="form-label fw-bold text-success">✨ 已成功抓取 2D 分子結構預覽：</label><br>
+                <canvas id="previewCanvas" width="220" height="150" class="chem-canvas shadow-sm p-2"></canvas>
             </div>
 
             <div class="col-md-6">
@@ -140,7 +141,7 @@
     </form>
 </div>
 
-<!-- 彈窗Modal -->
+<!-- 放大彈窗Modal -->
 <div class="modal fade" id="structModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content text-center p-3">
@@ -188,7 +189,7 @@
             lblBarcode: "瓶身條碼 *",
             lblName: "藥品名稱 *",
             lblCas: "CAS Number",
-            btnFetchCas: "🔍 自動帶入",
+            btnFetchCas: "🔍 自動帶入結構",
             lblSmiles: "SMILES 結構式",
             lblSafety: "安衛分類 *",
             lblLocation: "擺放位置座標 *",
@@ -230,7 +231,7 @@
             lblBarcode: "Bottle Barcode *",
             lblName: "Chemical Name *",
             lblCas: "CAS Number",
-            btnFetchCas: "🔍 Auto-fetch",
+            btnFetchCas: "🔍 Auto Fetch",
             lblSmiles: "SMILES Structure",
             lblSafety: "Safety Class *",
             lblLocation: "Location *",
@@ -289,37 +290,43 @@
         renderResults();
     }
 
-    // 後端代理 API：透過 CAS No. 100% 成功帶入黑色實體文字與 2D 結構
+    // 全自動查詢 PubChem 並直接即時繪製 2D 結構
     async function fetchPubChemByCas() {
         const cas = document.getElementById('addCas').value.trim();
         const btn = document.getElementById('btnFetchCas');
         if (!cas) {
-            alert('請先輸入 CAS Number！');
+            alert('請先在 CAS Number 欄位輸入號碼！');
             return;
         }
 
         const origText = btn.innerText;
-        btn.innerText = '查詢中...';
+        btn.innerText = '⏳ 檢索中...';
         btn.disabled = true;
 
         try {
-            const res = await fetch('/api/pubchem/' + encodeURIComponent(cas));
+            const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cas)}/property/Title,IsomericSMILES,CanonicalSMILES/JSON`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('PubChem 查無此 CAS Number');
+
             const data = await res.json();
-            
-            if (data.status === 'success') {
-                if (data.smiles) {
-                    document.getElementById('addSmiles').value = data.smiles;
-                    previewStructure();
-                }
-                if (data.name && !document.getElementById('addName').value.trim()) {
-                    document.getElementById('addName').value = data.name;
-                }
-                alert('成功自動帶入化學結構與名稱！');
-            } else {
-                alert('PubChem 查無此 CAS Number 資料');
+            const props = data.PropertyTable.Properties[0];
+            const rawSmiles = props.IsomericSMILES || props.CanonicalSMILES;
+            const name = props.Title;
+
+            if (rawSmiles) {
+                // 自動填入黑字 SMILES
+                const smilesInput = document.getElementById('addSmiles');
+                smilesInput.value = rawSmiles;
+                
+                // 立即畫出 2D 結構圖預覽
+                previewStructure();
+            }
+
+            if (name && !document.getElementById('addName').value.trim()) {
+                document.getElementById('addName').value = name;
             }
         } catch (err) {
-            alert('連線失敗：' + err.message);
+            alert('檢索失敗：' + err.message + '\n請確認 CAS 號碼是否正確。');
         } finally {
             btn.innerText = origText;
             btn.disabled = false;
@@ -391,6 +398,7 @@
             }
         });
 
+        // 渲染 2D 結構圖
         currentSearchResults.forEach((item, index) => {
             if (item.smiles && item.smiles !== '-') {
                 SmilesDrawer.parse(item.smiles, function (tree) {
@@ -413,13 +421,13 @@
     function previewStructure() {
         const smiles = document.getElementById('addSmiles').value.trim();
         const box = document.getElementById('previewBox');
-        if (!smiles) {
+        if (!smiles || smiles === '-') {
             box.style.display = 'none';
             return;
         }
         box.style.display = 'block';
         SmilesDrawer.parse(smiles, function (tree) {
-            let pDrawer = new SmilesDrawer.Drawer({ width: 180, height: 120 });
+            let pDrawer = new SmilesDrawer.Drawer({ width: 220, height: 150 });
             pDrawer.draw(tree, 'previewCanvas', 'light', false);
         });
     }

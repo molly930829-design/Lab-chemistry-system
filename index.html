@@ -88,29 +88,33 @@
 
             <div class="col-md-3">
                 <label class="form-label fw-bold" id="lblSafety">安衛分類 *</label>
-                <select id="addSafety" class="form-select" required>
-                    <option value="">-- 請選擇分類 --</option>
-                    <option value="一般藥品">一般藥品 (General)</option>
-                    <option value="易燃液體">易燃液體 (Flammable)</option>
-                    <option value="毒性物質">毒性物質 (Toxic)</option>
-                    <option value="腐蝕性物質">腐蝕性物質 (Corrosive)</option>
-                    <option value="強氧化劑">強氧化劑 (Oxidizer)</option>
-                    <option value="禁水性物質">禁水性物質 (Water-reactive)</option>
-                </select>
+               <select id="addSafety" class="form-select" required>
+    <option value="">-- 請選擇分類 --</option>
+    <option value="一般藥品">一般藥品 (General)</option>
+    <option value="易燃液體">易燃液體 (Flammable)</option>
+    <option value="毒性物質">毒性物質 (Toxic)</option>
+    <option value="腐蝕性物質">腐蝕性物質 (Corrosive)</option>
+    <option value="強氧化劑">強氧化劑 (Oxidizer)</option>
+    <option value="禁水性物質">禁水性物質 (Water-reactive)</option>
+    <!-- ➕ 新增項目：直接在下面加一行 -->
+    <option value="管制藥品">管制藥品 (Controlled Substance)</option>
+</select>
             </div>
 
             <div class="col-md-3">
                 <label class="form-label fw-bold" id="lblLocation">擺放位置座標 *</label>
-                <select id="addLocation" class="form-select" required>
-                    <option value="">-- 請選擇位置 --</option>
-                    <option value="防爆櫃 A-1">防爆櫃 A-1</option>
-                    <option value="防爆櫃 A-2">防爆櫃 A-2</option>
-                    <option value="藥品櫃 B-1">藥品櫃 B-1</option>
-                    <option value="藥品櫃 B-2">藥品櫃 B-2</option>
-                    <option value="酸鹼櫃 C-1">酸鹼櫃 C-1</option>
-                    <option value="冷藏冰箱 R-1">冷藏冰箱 R-1</option>
-                    <option value="冷凍冰箱 F-1">冷凍冰箱 F-1</option>
-                </select>
+               <select id="addLocation" class="form-select" required>
+    <option value="">-- 請選擇位置 --</option>
+    <option value="防爆櫃 A-1">防爆櫃 A-1</option>
+    <option value="防爆櫃 A-2">防爆櫃 A-2</option>
+    <option value="藥品櫃 B-1">藥品櫃 B-1</option>
+    <option value="藥品櫃 B-2">藥品櫃 B-2</option>
+    <option value="酸鹼櫃 C-1">酸鹼櫃 C-1</option>
+    <option value="冷藏冰箱 R-1">冷藏冰箱 R-1</option>
+    <option value="冷凍冰箱 F-1">冷凍冰箱 F-1</option>
+    <!-- ➕ 新增位置：直接在下面加一行 -->
+    <option value="超低溫冷凍櫃 F-2">超低溫冷凍櫃 F-2</option>
+</select>
             </div>
 
             <div class="col-md-6">

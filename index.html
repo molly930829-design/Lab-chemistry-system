@@ -89,7 +89,7 @@
 
             <div class="col-md-6">
                 <label class="form-label fw-bold" id="lblSmiles">SMILES 結構式</label>
-                <input type="text" id="addSmiles" class="form-control" placeholder="例如：CC(=O)C（可手動輸入或自動帶入）" oninput="previewStructure()">
+                <input type="text" id="addSmiles" class="form-control" placeholder="例如：CC(=O)C" oninput="previewStructure()">
             </div>
 
             <div class="col-md-3">
@@ -140,7 +140,7 @@
     </form>
 </div>
 
-<!-- 放大彈窗Modal -->
+<!-- 彈窗Modal -->
 <div class="modal fade" id="structModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content text-center p-3">
@@ -289,7 +289,7 @@
         renderResults();
     }
 
-    // 連接 PubChem 官方 API，透過 CAS No. 自動查詢名稱與 SMILES 結構
+    // 後端代理 API：透過 CAS No. 100% 成功帶入黑色實體文字與 2D 結構
     async function fetchPubChemByCas() {
         const cas = document.getElementById('addCas').value.trim();
         const btn = document.getElementById('btnFetchCas');
@@ -303,25 +303,23 @@
         btn.disabled = true;
 
         try {
-            const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cas)}/property/Title,IsomericSMILES,CanonicalSMILES/JSON`;
-            const res = await fetch(url);
-            if (!res.ok) throw new Error('PubChem 查無此 CAS Number 資料');
-
+            const res = await fetch('/api/pubchem/' + encodeURIComponent(cas));
             const data = await res.json();
-            const props = data.PropertyTable.Properties[0];
-            const smiles = props.IsomericSMILES || props.CanonicalSMILES;
-            const name = props.Title;
-
-            if (smiles) {
-                document.getElementById('addSmiles').value = smiles;
-                previewStructure();
+            
+            if (data.status === 'success') {
+                if (data.smiles) {
+                    document.getElementById('addSmiles').value = data.smiles;
+                    previewStructure();
+                }
+                if (data.name && !document.getElementById('addName').value.trim()) {
+                    document.getElementById('addName').value = data.name;
+                }
+                alert('成功自動帶入化學結構與名稱！');
+            } else {
+                alert('PubChem 查無此 CAS Number 資料');
             }
-            if (name && !document.getElementById('addName').value.trim()) {
-                document.getElementById('addName').value = name;
-            }
-            alert('成功找到化學結構與名稱！');
         } catch (err) {
-            alert('查詢失敗：' + err.message);
+            alert('連線失敗：' + err.message);
         } finally {
             btn.innerText = origText;
             btn.disabled = false;
@@ -393,7 +391,6 @@
             }
         });
 
-        // 繪製 2D 結構圖
         currentSearchResults.forEach((item, index) => {
             if (item.smiles && item.smiles !== '-') {
                 SmilesDrawer.parse(item.smiles, function (tree) {

@@ -16,7 +16,6 @@
 <body>
 
 <div class="container position-relative">
-    <!-- 語言切換按鈕 -->
     <button class="btn btn-outline-secondary lang-btn btn-sm" onclick="toggleLanguage()" id="langBtn">English</button>
 
     <h2 class="text-center mb-4" id="title">🧪 實驗室藥品精密管理系統</h2>
@@ -30,7 +29,7 @@
         </div>
     </div>
 
-    <!-- 模糊搜尋區 -->
+    <!-- 搜尋區 -->
     <div class="mb-4">
         <label for="searchInput" class="form-label fw-bold" id="searchLabel">🔍 藥品搜尋 (支援名稱模糊搜尋、CAS No.、SMILES 結構式、條碼、擺放位置)</label>
         <div class="input-group">
@@ -86,35 +85,34 @@
                 <input type="text" id="addSmiles" class="form-control" placeholder="例如：CC(C)(C)OC(=O)C">
             </div>
 
+            <!-- 可選擇也可自由輸入的新版安衛分類 -->
             <div class="col-md-3">
                 <label class="form-label fw-bold" id="lblSafety">安衛分類 *</label>
-               <select id="addSafety" class="form-select" required>
-    <option value="">-- 請選擇分類 --</option>
-    <option value="一般藥品">一般藥品 (General)</option>
-    <option value="易燃液體">易燃液體 (Flammable)</option>
-    <option value="毒性物質">毒性物質 (Toxic)</option>
-    <option value="腐蝕性物質">腐蝕性物質 (Corrosive)</option>
-    <option value="強氧化劑">強氧化劑 (Oxidizer)</option>
-    <option value="禁水性物質">禁水性物質 (Water-reactive)</option>
-    <!-- ➕ 新增項目：直接在下面加一行 -->
-    <option value="管制藥品">管制藥品 (Controlled Substance)</option>
-</select>
+                <input type="text" id="addSafety" list="safetyOptions" class="form-control" placeholder="可選取或直接輸入新分類" required>
+                <datalist id="safetyOptions">
+                    <option value="一般藥品"></option>
+                    <option value="易燃液體"></option>
+                    <option value="毒性物質"></option>
+                    <option value="腐蝕性物質"></option>
+                    <option value="強氧化劑"></option>
+                    <option value="禁水性物質"></option>
+                    <option value="管制藥品"></option>
+                </datalist>
             </div>
 
+            <!-- 可選擇也可自由輸入的新版位置座標 -->
             <div class="col-md-3">
                 <label class="form-label fw-bold" id="lblLocation">擺放位置座標 *</label>
-               <select id="addLocation" class="form-select" required>
-    <option value="">-- 請選擇位置 --</option>
-    <option value="防爆櫃 A-1">防爆櫃 A-1</option>
-    <option value="防爆櫃 A-2">防爆櫃 A-2</option>
-    <option value="藥品櫃 B-1">藥品櫃 B-1</option>
-    <option value="藥品櫃 B-2">藥品櫃 B-2</option>
-    <option value="酸鹼櫃 C-1">酸鹼櫃 C-1</option>
-    <option value="冷藏冰箱 R-1">冷藏冰箱 R-1</option>
-    <option value="冷凍冰箱 F-1">冷凍冰箱 F-1</option>
-    <!-- ➕ 新增位置：直接在下面加一行 -->
-    <option value="超低溫冷凍櫃 F-2">超低溫冷凍櫃 F-2</option>
-</select>
+                <input type="text" id="addLocation" list="locationOptions" class="form-control" placeholder="可選取或直接輸入新位置" required>
+                <datalist id="locationOptions">
+                    <option value="防爆櫃 A-1"></option>
+                    <option value="防爆櫃 A-2"></option>
+                    <option value="藥品櫃 B-1"></option>
+                    <option value="藥品櫃 B-2"></option>
+                    <option value="酸鹼櫃 C-1"></option>
+                    <option value="冷藏冰箱 R-1"></option>
+                    <option value="冷凍冰箱 F-1"></option>
+                </datalist>
             </div>
 
             <div class="col-md-6">
@@ -168,6 +166,8 @@
             lblSmiles: "SMILES 結構式",
             lblSafety: "安衛分類 *",
             lblLocation: "擺放位置座標 *",
+            safetyPh: "可選取或直接輸入新分類",
+            locationPh: "可選取或直接輸入新位置",
             lblSpec: "規格 / 純度",
             lblNote: "備註",
             btnSubmit: "儲存建檔 / 更新資料",
@@ -207,6 +207,8 @@
             lblSmiles: "SMILES Structure",
             lblSafety: "Safety Class *",
             lblLocation: "Location *",
+            safetyPh: "Select or type new safety class",
+            locationPh: "Select or type new location",
             lblSpec: "Spec / Purity",
             lblNote: "Note",
             btnSubmit: "Save / Update Chemical",
@@ -247,6 +249,8 @@
         document.getElementById('lblSmiles').innerText = t.lblSmiles;
         document.getElementById('lblSafety').innerText = t.lblSafety;
         document.getElementById('lblLocation').innerText = t.lblLocation;
+        document.getElementById('addSafety').placeholder = t.safetyPh;
+        document.getElementById('addLocation').placeholder = t.locationPh;
         document.getElementById('lblSpec').innerText = t.lblSpec;
         document.getElementById('lblNote').innerText = t.lblNote;
         document.getElementById('btnSubmit').innerText = t.btnSubmit;
@@ -347,8 +351,8 @@
             name: nameInput,
             cas_no: document.getElementById('addCas').value.trim(),
             smiles: document.getElementById('addSmiles').value.trim(),
-            safety_class: document.getElementById('addSafety').value,
-            location: document.getElementById('addLocation').value,
+            safety_class: document.getElementById('addSafety').value.trim(),
+            location: document.getElementById('addLocation').value.trim(),
             spec: document.getElementById('addSpec').value.trim(),
             note: document.getElementById('addNote').value.trim()
         };

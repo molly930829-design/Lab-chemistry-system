@@ -78,7 +78,7 @@
                 <label class="form-label fw-bold" id="lblCas">CAS Number</label>
                 <div class="input-group">
                     <input type="text" id="addCas" class="form-control" placeholder="例如：67-64-1">
-                    <button class="btn btn-primary" type="button" onclick="fetchPubChemByCas()" id="btnFetchCas">🔍 自動帶入結構</button>
+                    <button class="btn btn-primary" type="button" onclick="fetchPubChemByCas()" id="btnFetchCas">🔍 自動帶入</button>
                 </div>
             </div>
 
@@ -189,7 +189,7 @@
             lblBarcode: "瓶身條碼 *",
             lblName: "藥品名稱 *",
             lblCas: "CAS Number",
-            btnFetchCas: "🔍 自動帶入結構",
+            btnFetchCas: "🔍 自動帶入",
             lblSmiles: "SMILES 結構式",
             lblSafety: "安衛分類 *",
             lblLocation: "擺放位置座標 *",
@@ -231,7 +231,7 @@
             lblBarcode: "Bottle Barcode *",
             lblName: "Chemical Name *",
             lblCas: "CAS Number",
-            btnFetchCas: "🔍 Auto Fetch",
+            btnFetchCas: "🔍 Auto-fetch",
             lblSmiles: "SMILES Structure",
             lblSafety: "Safety Class *",
             lblLocation: "Location *",
@@ -290,45 +290,37 @@
         renderResults();
     }
 
-    // 全自動查詢 PubChem 並直接即時繪製 2D 結構
     async function fetchPubChemByCas() {
         const cas = document.getElementById('addCas').value.trim();
         const btn = document.getElementById('btnFetchCas');
         if (!cas) {
-            alert('請先在 CAS Number 欄位輸入號碼！');
+            alert('請先輸入 CAS Number！');
             return;
         }
 
-        const origText = btn.innerText;
         btn.innerText = '⏳ 檢索中...';
         btn.disabled = true;
 
         try {
-            const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cas)}/property/Title,IsomericSMILES,CanonicalSMILES/JSON`;
-            const res = await fetch(url);
-            if (!res.ok) throw new Error('PubChem 查無此 CAS Number');
-
+            const res = await fetch('/api/pubchem/' + encodeURIComponent(cas));
             const data = await res.json();
-            const props = data.PropertyTable.Properties[0];
-            const rawSmiles = props.IsomericSMILES || props.CanonicalSMILES;
-            const name = props.Title;
-
-            if (rawSmiles) {
-                // 自動填入黑字 SMILES
-                const smilesInput = document.getElementById('addSmiles');
-                smilesInput.value = rawSmiles;
-                
-                // 立即畫出 2D 結構圖預覽
-                previewStructure();
-            }
-
-            if (name && !document.getElementById('addName').value.trim()) {
-                document.getElementById('addName').value = name;
+            
+            if (data.status === 'success') {
+                if (data.smiles) {
+                    document.getElementById('addSmiles').value = data.smiles;
+                    previewStructure();
+                }
+                if (data.name && !document.getElementById('addName').value.trim()) {
+                    document.getElementById('addName').value = data.name;
+                }
+                alert('成功找到化學結構與名稱！');
+            } else {
+                alert('PubChem 查無此 CAS Number 資料');
             }
         } catch (err) {
-            alert('檢索失敗：' + err.message + '\n請確認 CAS 號碼是否正確。');
+            alert('連線失敗：' + err.message);
         } finally {
-            btn.innerText = origText;
+            btn.innerText = '🔍 自動帶入';
             btn.disabled = false;
         }
     }
@@ -398,7 +390,6 @@
             }
         });
 
-        // 渲染 2D 結構圖
         currentSearchResults.forEach((item, index) => {
             if (item.smiles && item.smiles !== '-') {
                 SmilesDrawer.parse(item.smiles, function (tree) {

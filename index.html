@@ -291,34 +291,42 @@
     }
 
     async function fetchPubChemByCas() {
-        const cas = document.getElementById('addCas').value.trim();
+        const rawCas = document.getElementById('addCas').value.trim();
         const btn = document.getElementById('btnFetchCas');
-        if (!cas) {
-            alert('請先輸入 CAS Number！');
+        if (!rawCas) {
+            alert('請先在 CAS Number 欄位輸入號碼！');
             return;
         }
 
         btn.innerText = '⏳ 檢索中...';
         btn.disabled = true;
 
+        const cleanCas = rawCas.replace(/-/g, '').trim();
+
         try {
-            const res = await fetch('/api/pubchem/' + encodeURIComponent(cas));
-            const data = await res.json();
+            let res = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(rawCas)}/property/Title,IsomericSMILES,CanonicalSMILES/JSON`);
             
-            if (data.status === 'success') {
-                if (data.smiles) {
-                    document.getElementById('addSmiles').value = data.smiles;
-                    previewStructure();
-                }
-                if (data.name && !document.getElementById('addName').value.trim()) {
-                    document.getElementById('addName').value = data.name;
-                }
-                alert('成功找到化學結構與名稱！');
-            } else {
-                alert('PubChem 查無此 CAS Number 資料');
+            if (!res.ok) {
+                res = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cleanCas)}/property/Title,IsomericSMILES,CanonicalSMILES/JSON`);
             }
+
+            if (!res.ok) throw new Error('PubChem 查無此 CAS 資料');
+
+            const data = await res.json();
+            const props = data.PropertyTable.Properties[0];
+            const smiles = props.IsomericSMILES || props.CanonicalSMILES;
+            const name = props.Title;
+
+            if (smiles) {
+                document.getElementById('addSmiles').value = smiles;
+                previewStructure();
+            }
+            if (name && !document.getElementById('addName').value.trim()) {
+                document.getElementById('addName').value = name;
+            }
+            alert('成功自動帶入化學結構與名稱！');
         } catch (err) {
-            alert('連線失敗：' + err.message);
+            alert('檢索失敗：' + err.message);
         } finally {
             btn.innerText = '🔍 自動帶入';
             btn.disabled = false;

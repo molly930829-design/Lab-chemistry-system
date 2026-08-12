@@ -77,9 +77,9 @@ def read_root():
 @app.get("/api/pubchem/{cas}")
 def fetch_pubchem(cas: str):
     try:
-        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{cas}/property/Title,IsomericSMILES,CanonicalSMILES/JSON"
+        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{cas.strip()}/property/Title,IsomericSMILES,CanonicalSMILES/JSON"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=5) as response:
             data = json.loads(response.read().decode())
             props = data["PropertyTable"]["Properties"][0]
             smiles = props.get("IsomericSMILES") or props.get("CanonicalSMILES") or ""

@@ -3,3 +3,4 @@ uvicorn
 pydantic
 python-barcode
 pillow
+psycopg2-binary

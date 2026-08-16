@@ -1,15 +1,18 @@
-from fastapi import FastAPI, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Query, Header, HTTPException
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 import os
 import psycopg2
 import urllib.request
 import json
+import csv
+import io
 
 app = FastAPI()
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
+ADMIN_KEY = os.environ.get("ADMIN_KEY", "labadmin2026") # 預設管理員密碼，可在 Render 環境變數自訂
 
 def get_db_connection():
     if DATABASE_URL:
@@ -30,6 +33,8 @@ def init_db():
                 name TEXT NOT NULL,
                 cas_no TEXT,
                 smiles TEXT,
+                formula TEXT,
+                mw TEXT,
                 safety_class TEXT,
                 location TEXT,
                 spec TEXT,
@@ -48,6 +53,8 @@ def init_db():
             name VARCHAR(255) NOT NULL,
             cas_no VARCHAR(255),
             smiles VARCHAR(255),
+            formula VARCHAR(255),
+            mw VARCHAR(255),
             safety_class VARCHAR(255),
             location VARCHAR(255),
             spec VARCHAR(255),
@@ -65,6 +72,8 @@ class Chemical(BaseModel):
     name: str
     cas_no: Optional[str] = ""
     smiles: Optional[str] = ""
+    formula: Optional[str] = ""
+    mw: Optional[str] = ""
     safety_class: Optional[str] = ""
     location: Optional[str] = ""
     spec: Optional[str] = ""
@@ -78,6 +87,73 @@ class UpdateLocationPayload(BaseModel):
 def read_root():
     return FileResponse("index.html")
 
+# 驗證管理員權限
+def verify_admin(x_admin_key: Optional[str] = Header(None)):
+    if x_admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="權限不足：管理員密碼錯誤")
+
+@app.post("/api/verify_key")
+def check_key(payload: dict):
+    if payload.get("key") == ADMIN_KEY:
+        return {"status": "success", "role": "admin"}
+    return {"status": "error", "message": "密碼錯誤"}
+
+@app.get("/api/search")
+def search_chemical(q: str = Query("")):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    keyword = f"%{q.strip()}%"
+    
+    if DATABASE_URL:
+        if not q.strip():
+            cursor.execute("SELECT barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, note FROM chemicals LIMIT 100")
+        else:
+            cursor.execute("""
+                SELECT barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, note 
+                FROM chemicals 
+                WHERE barcode ILIKE %s 
+                   OR name ILIKE %s 
+                   OR cas_no ILIKE %s 
+                   OR smiles ILIKE %s 
+                   OR location ILIKE %s 
+                   OR safety_class ILIKE %s
+            """, (keyword, keyword, keyword, keyword, keyword, keyword))
+    else:
+        if not q.strip():
+            cursor.execute("SELECT barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, note FROM chemicals LIMIT 100")
+        else:
+            cursor.execute("""
+                SELECT barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, note 
+                FROM chemicals 
+                WHERE barcode LIKE ? 
+                   OR name LIKE ? 
+                   OR cas_no LIKE ? 
+                   OR smiles LIKE ? 
+                   OR location LIKE ? 
+                   OR safety_class LIKE ?
+            """, (keyword, keyword, keyword, keyword, keyword, keyword))
+            
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    
+    results = []
+    for row in rows:
+        results.append({
+            "barcode": row[0] or "",
+            "name": row[1] or "",
+            "cas_no": row[2] if row[2] else "-",
+            "smiles": row[3] if row[3] else "-",
+            "formula": row[4] if row[4] else "-",
+            "mw": row[5] if row[5] else "-",
+            "safety_class": row[6] if row[6] else "-",
+            "location": row[7] if row[7] else "-",
+            "spec": row[8] if row[8] else "-",
+            "note": row[9] if row[9] else "-"
+        })
+    return results
+
+# 一般成員即可呼叫：掃描批量歸位
 @app.post("/api/update_location")
 def update_chemical_location(payload: UpdateLocationPayload):
     conn = get_db_connection()
@@ -103,82 +179,33 @@ def update_chemical_location(payload: UpdateLocationPayload):
         conn.close()
         return {"status": "error", "message": str(e)}
 
-@app.get("/api/search")
-def search_chemical(q: str = Query("")):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    keyword = f"%{q.strip()}%"
-    
-    if DATABASE_URL:
-        if not q.strip():
-            cursor.execute("SELECT barcode, name, cas_no, smiles, safety_class, location, spec, note FROM chemicals LIMIT 50")
-        else:
-            cursor.execute("""
-                SELECT barcode, name, cas_no, smiles, safety_class, location, spec, note 
-                FROM chemicals 
-                WHERE barcode ILIKE %s 
-                   OR name ILIKE %s 
-                   OR cas_no ILIKE %s 
-                   OR smiles ILIKE %s 
-                   OR location ILIKE %s 
-                   OR safety_class ILIKE %s
-            """, (keyword, keyword, keyword, keyword, keyword, keyword))
-    else:
-        if not q.strip():
-            cursor.execute("SELECT barcode, name, cas_no, smiles, safety_class, location, spec, note FROM chemicals LIMIT 50")
-        else:
-            cursor.execute("""
-                SELECT barcode, name, cas_no, smiles, safety_class, location, spec, note 
-                FROM chemicals 
-                WHERE barcode LIKE ? 
-                   OR name LIKE ? 
-                   OR cas_no LIKE ? 
-                   OR smiles LIKE ? 
-                   OR location LIKE ? 
-                   OR safety_class LIKE ?
-            """, (keyword, keyword, keyword, keyword, keyword, keyword))
-            
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    
-    results = []
-    for row in rows:
-        results.append({
-            "barcode": row[0] or "",
-            "name": row[1] or "",
-            "cas_no": row[2] if row[2] else "-",
-            "smiles": row[3] if row[3] else "-",
-            "safety_class": row[4] if row[4] else "-",
-            "location": row[5] if row[5] else "-",
-            "spec": row[6] if row[6] else "-",
-            "note": row[7] if row[7] else "-"
-        })
-    return results
-
+# 管理員專屬：新增/更新藥品
 @app.post("/api/add_chemical")
-def add_chemical(chem: Chemical):
+def add_chemical(chem: Chemical, x_admin_key: Optional[str] = Header(None)):
+    verify_admin(x_admin_key)
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         if DATABASE_URL:
             cursor.execute("""
-                INSERT INTO chemicals (barcode, name, cas_no, smiles, safety_class, location, spec, note)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO chemicals (barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, note)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (barcode) DO UPDATE SET
                     name = EXCLUDED.name,
                     cas_no = EXCLUDED.cas_no,
                     smiles = EXCLUDED.smiles,
+                    formula = EXCLUDED.formula,
+                    mw = EXCLUDED.mw,
                     safety_class = EXCLUDED.safety_class,
                     location = EXCLUDED.location,
                     spec = EXCLUDED.spec,
                     note = EXCLUDED.note;
-            """, (chem.barcode, chem.name, chem.cas_no, chem.smiles, chem.safety_class, chem.location, chem.spec, chem.note))
+            """, (chem.barcode, chem.name, chem.cas_no, chem.smiles, chem.formula, chem.mw, chem.safety_class, chem.location, chem.spec, chem.note))
         else:
             cursor.execute("""
-                INSERT OR REPLACE INTO chemicals (barcode, name, cas_no, smiles, safety_class, location, spec, note)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (chem.barcode, chem.name, chem.cas_no, chem.smiles, chem.safety_class, chem.location, chem.spec, chem.note))
+                INSERT OR REPLACE INTO chemicals (barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, note)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (chem.barcode, chem.name, chem.cas_no, chem.smiles, chem.formula, chem.mw, chem.safety_class, chem.location, chem.spec, chem.note))
             
         conn.commit()
         cursor.close()
@@ -188,8 +215,10 @@ def add_chemical(chem: Chemical):
         conn.close()
         return {"status": "error", "message": str(e)}
 
+# 管理員專屬：刪除藥品
 @app.delete("/api/delete_chemical/{barcode}")
-def delete_chemical(barcode: str):
+def delete_chemical(barcode: str, x_admin_key: Optional[str] = Header(None)):
+    verify_admin(x_admin_key)
     conn = get_db_connection()
     cursor = conn.cursor()
     if DATABASE_URL:
@@ -200,3 +229,33 @@ def delete_chemical(barcode: str):
     cursor.close()
     conn.close()
     return {"status": "success"}
+
+# 資料庫自動備份與匯出 (JSON 備份)
+@app.get("/api/backup/json")
+def backup_database_json(x_admin_key: Optional[str] = Header(None)):
+    verify_admin(x_admin_key)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, note FROM chemicals")
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    
+    backup_data = []
+    for r in rows:
+        backup_data.append({
+            "barcode": r[0],
+            "name": r[1],
+            "cas_no": r[2],
+            "smiles": r[3],
+            "formula": r[4],
+            "mw": r[5],
+            "safety_class": r[6],
+            "location": r[7],
+            "spec": r[8],
+            "note": r[9]
+        })
+    return JSONResponse(
+        content=backup_data,
+        headers={"Content-Disposition": "attachment; filename=lab_chemicals_backup.json"}
+    )

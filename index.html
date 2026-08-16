@@ -35,7 +35,6 @@
             <span class="badge bg-light text-primary" id="scanModeBadge">一般查詢模式</span>
         </div>
         <div class="card-body text-center">
-            <!-- 批量入櫃提示橫幅 -->
             <div id="cabinetBanner" class="cabinet-banner">
                 <h5 class="text-success fw-bold mb-1">📍 批量入櫃中：<span id="currentCabinetName">未鎖定</span></h5>
                 <small class="text-muted">已鎖定目標藥櫃！接下來掃描的所有藥品將直接歸入此櫃。</small>
@@ -160,7 +159,6 @@
                     <input type="text" id="addNote" class="form-control" placeholder="例如：開瓶日期、保管人...">
                 </div>
 
-                <!-- 2D 結構即時預覽畫布 -->
                 <div class="col-12 text-center" id="previewBox" style="display:none;">
                     <label class="form-label fw-bold text-success">✨ 2D 分子結構預覽：</label><br>
                     <canvas id="previewCanvas" width="220" height="150" class="chem-canvas shadow-sm p-2"></canvas>
@@ -491,54 +489,95 @@
         isProcessingScan = false;
     }
 
-    // PubChem 查詢：自動取得 SMILES、分子式 Formula、分子量 MW 與名稱
+    // 支援兩階段同義詞 CID 與直接名稱查詢的多重容錯檢索
     async function fetchPubChemByCas() {
         const rawCas = document.getElementById('addCas').value.trim();
+        const inputName = document.getElementById('addName').value.trim();
         const btn = document.getElementById('btnFetchCas');
-        if (!rawCas) {
-            alert('請先輸入 CAS Number！');
+        
+        if (!rawCas && !inputName) {
+            alert('請先輸入 CAS Number 或 藥品英文名稱！');
             return;
         }
 
         btn.innerText = '⏳ 檢索中...';
         btn.disabled = true;
 
-        try {
-            const cidUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/substance/name/${encodeURIComponent(rawCas)}/cids/JSON`;
-            const cidRes = await fetch(cidUrl);
-            
-            if (cidRes.ok) {
-                const cidData = await cidRes.json();
-                const cid = cidData.IdentifierList && cidData.IdentifierList.CID ? cidData.IdentifierList.CID[0] : null;
+        let smiles = '';
+        let formula = '';
+        let mw = '';
+        let fetchedName = '';
 
-                if (cid) {
-                    const propUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/Title,CanonicalSMILES,IsomericSMILES,MolecularFormula,MolecularWeight/JSON`;
-                    const propRes = await fetch(propUrl);
-                    if (propRes.ok) {
-                        const propData = await propRes.json();
-                        const props = propData.PropertyTable.Properties[0];
-                        const smiles = props.CanonicalSMILES || props.IsomericSMILES || '';
-                        const name = props.Title || '';
-                        const formula = props.MolecularFormula || '';
-                        const mw = props.MolecularWeight || '';
+        const cleanCas = rawCas.replace(/-/g, '').trim();
 
-                        if (smiles) {
-                            document.getElementById('addSmiles').value = smiles;
-                            previewStructure();
-                        }
-                        if (formula) document.getElementById('addFormula').value = formula;
-                        if (mw) document.getElementById('addMw').value = mw;
-                        if (name && !document.getElementById('addName').value.trim()) {
-                            document.getElementById('addName').value = name;
-                        }
+        // 策略 1：使用 CAS / cleanCas 查詢 CID
+        let cid = null;
+        for (let queryStr of [rawCas, cleanCas]) {
+            if (!queryStr) continue;
+            try {
+                const cidRes = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/substance/name/${encodeURIComponent(queryStr)}/cids/JSON`);
+                if (cidRes.ok) {
+                    const cidData = await cidRes.json();
+                    if (cidData.IdentifierList && cidData.IdentifierList.CID && cidData.IdentifierList.CID.length > 0) {
+                        cid = cidData.IdentifierList.CID[0];
+                        break;
                     }
                 }
+            } catch (e) {}
+        }
+
+        // 若取得 CID，由 CID 取回完整屬性
+        if (cid) {
+            try {
+                const propRes = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/Title,CanonicalSMILES,IsomericSMILES,MolecularFormula,MolecularWeight/JSON`);
+                if (propRes.ok) {
+                    const propData = await propRes.json();
+                    const props = propData.PropertyTable.Properties[0];
+                    smiles = props.CanonicalSMILES || props.IsomericSMILES || '';
+                    formula = props.MolecularFormula || '';
+                    mw = props.MolecularWeight ? String(props.MolecularWeight) : '';
+                    fetchedName = props.Title || '';
+                }
+            } catch (e) {}
+        }
+
+        // 策略 2（備援）：若 CID 未取得，直接以 Name 或 CAS 發送 property 查詢
+        if (!smiles) {
+            const fallbackKeywords = [rawCas, cleanCas, inputName].filter(Boolean);
+            for (let kw of fallbackKeywords) {
+                try {
+                    const directRes = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(kw)}/property/Title,CanonicalSMILES,IsomericSMILES,MolecularFormula,MolecularWeight/JSON`);
+                    if (directRes.ok) {
+                        const directData = await directRes.json();
+                        if (directData.PropertyTable && directData.PropertyTable.Properties && directData.PropertyTable.Properties.length > 0) {
+                            const p = directData.PropertyTable.Properties[0];
+                            smiles = p.CanonicalSMILES || p.IsomericSMILES || '';
+                            formula = p.MolecularFormula || '';
+                            mw = p.MolecularWeight ? String(p.MolecularWeight) : '';
+                            fetchedName = p.Title || '';
+                            if (smiles) break;
+                        }
+                    }
+                } catch (e) {}
             }
-        } catch (err) {
-            console.log('PubChem 檢索靜態完成');
-        } finally {
-            btn.innerText = '🔍 自動帶入';
-            btn.disabled = false;
+        }
+
+        btn.innerText = '🔍 自動帶入';
+        btn.disabled = false;
+
+        if (smiles || formula || mw) {
+            if (smiles) {
+                document.getElementById('addSmiles').value = smiles;
+                previewStructure();
+            }
+            if (formula) document.getElementById('addFormula').value = formula;
+            if (mw) document.getElementById('addMw').value = mw;
+            if (fetchedName && !document.getElementById('addName').value.trim()) {
+                document.getElementById('addName').value = fetchedName;
+            }
+            alert(`✨ 成功帶入結構與分子數據！\n・SMILES: ${smiles}\n・分子式: ${formula}\n・分子量: ${mw} g/mol`);
+        } else {
+            alert('PubChem 未能辨識此 CAS 號碼，請確認號碼是否有誤，或手動填入 SMILES 結構式。');
         }
     }
 
@@ -764,7 +803,6 @@
         }
     }
 
-    // 初始化自動檢查本地管理員狀態
     if (adminToken) {
         fetch('/api/verify_key', {
             method: 'POST',

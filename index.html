@@ -1,4 +1,496 @@
-async function fetchPubChemByCas() {
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Chemical Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://unpkg.com/smiles-drawer@2.0.1/dist/smiles-drawer.min.js"></script>
+    <style>
+        body { background-color: #f8f9fa; padding: 20px; }
+        .container { max-width: 1200px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #reader { width: 100%; max-width: 400px; margin: 0 auto; display: none; }
+        .top-controls { position: absolute; top: 25px; right: 30px; display: flex; gap: 8px; }
+        .chem-canvas { cursor: pointer; background: #fff; border: 1px solid #dee2e6; border-radius: 6px; }
+        .cabinet-banner { display: none; background: #e8f5e9; border: 2px dashed #2e7d32; border-radius: 8px; padding: 12px; margin-bottom: 15px; }
+        .admin-only { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container position-relative">
+    <div class="top-controls">
+        <button class="btn btn-outline-dark btn-sm" onclick="showAuthModal()" id="btnAuth">🔐 登入管理員</button>
+        <button class="btn btn-outline-success btn-sm admin-only" onclick="downloadBackup()" id="btnBackup">💾 匯出備份</button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="toggleLanguage()" id="langBtn">English</button>
+    </div>
+
+    <h2 class="text-center mb-4" id="title">🧪 實驗室藥品精密管理系統</h2>
+
+    <!-- 相機掃描區 -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white fw-bold d-flex justify-content-between align-items-center">
+            <span id="scanHeader">相機條碼掃描（支援連續批量入櫃）</span>
+            <span class="badge bg-light text-primary" id="scanModeBadge">一般查詢模式</span>
+        </div>
+        <div class="card-body text-center">
+            <div id="cabinetBanner" class="cabinet-banner">
+                <h5 class="text-success fw-bold mb-1">📍 批量入櫃中：<span id="currentCabinetName">未鎖定</span></h5>
+                <small class="text-muted">已鎖定目標藥櫃！接下來掃描的所有藥品將直接歸入此櫃。</small>
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-outline-danger" onclick="exitCabinetMode()">結束入櫃模式</button>
+                </div>
+            </div>
+
+            <button class="btn btn-primary w-100 mb-2" id="btnScan" onclick="toggleScanner()">開啟相機掃描</button>
+            <div id="reader"></div>
+            <div id="scanFeedback" class="mt-2 fw-bold text-success" style="display:none;"></div>
+        </div>
+    </div>
+
+    <!-- 搜尋區 -->
+    <div class="mb-4">
+        <label for="searchInput" class="form-label fw-bold" id="searchLabel">🔍 藥品搜尋 (支援名稱模糊搜尋、CAS No.、SMILES 結構式、條碼、擺放位置)</label>
+        <div class="input-group">
+            <input type="text" id="searchInput" class="form-control" placeholder="輸入關鍵字（留空可列出所有藥品）..." onkeypress="handleKeyPress(event)">
+            <button class="btn btn-dark" type="button" onclick="searchChemical()" id="btnSearch">搜尋</button>
+        </div>
+    </div>
+
+    <!-- 查詢結果表格 -->
+    <h4 id="resultHeader">查詢結果</h4>
+    <div class="table-responsive mb-4">
+        <table class="table table-bordered table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th id="thBarcode">條碼</th>
+                    <th id="thName">藥品名稱</th>
+                    <th id="thCas">CAS No.</th>
+                    <th id="thFormula">分子式/分子量</th>
+                    <th id="thStructure">2D 化學結構</th>
+                    <th id="thSafety">安衛分類</th>
+                    <th id="thLocation">位置座標</th>
+                    <th id="thSpec">規格</th>
+                    <th id="thNote">備註</th>
+                    <th id="thAction" class="admin-only">操作</th>
+                </tr>
+            </thead>
+            <tbody id="resultBody">
+                <tr><td colspan="10" class="text-center text-muted" id="initialText">請點擊搜尋或輸入關鍵字</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 管理員專屬：新增 / 修改藥品建檔表單 -->
+    <div class="admin-only" id="adminFormSection">
+        <hr>
+        <h4 class="mb-3" id="addHeader">➕ 新增 / 修改藥品建檔 (管理員模式)</h4>
+        <form id="addForm" onsubmit="addChemical(event)">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold" id="lblBarcode">瓶身條碼 *</label>
+                    <input type="text" id="addBarcode" class="form-control" placeholder="例如：CHEM-00001" required>
+                </div>
+                
+                <div class="col-md-4">
+                    <label class="form-label fw-bold" id="lblCas">CAS Number</label>
+                    <div class="input-group">
+                        <input type="text" id="addCas" class="form-control" placeholder="例如：64-17-5">
+                        <button class="btn btn-primary" type="button" onclick="fetchPubChemByCas()" id="btnFetchCas">🔍 自動帶入</button>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold" id="lblName">藥品名稱 *</label>
+                    <input type="text" id="addName" class="form-control" placeholder="例如：Ethanol" required>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold" id="lblSmiles">SMILES 結構式</label>
+                    <input type="text" id="addSmiles" class="form-control" placeholder="輸入 CAS 自動帶入或手動貼上" oninput="previewStructure()">
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold" id="lblFormula">分子式 (Formula)</label>
+                    <input type="text" id="addFormula" class="form-control" placeholder="例如：C2H6O">
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold" id="lblMw">分子量 (MW, g/mol)</label>
+                    <input type="text" id="addMw" class="form-control" placeholder="例如：46.07">
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold" id="lblSafety">安衛分類 *</label>
+                    <input type="text" id="addSafety" list="safetyOptions" class="form-control" placeholder="可選取或直接輸入新分類" required>
+                    <datalist id="safetyOptions">
+                        <option value="一般藥品"></option>
+                        <option value="易燃液體"></option>
+                        <option value="毒性物質"></option>
+                        <option value="腐蝕性物質"></option>
+                        <option value="強氧化劑"></option>
+                        <option value="禁水性物質"></option>
+                        <option value="管制藥品"></option>
+                    </datalist>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold" id="lblLocation">擺放位置座標 *</label>
+                    <input type="text" id="addLocation" list="locationOptions" class="form-control" placeholder="可選取或直接輸入新位置" required>
+                    <datalist id="locationOptions">
+                        <option value="防爆櫃 A-1"></option>
+                        <option value="防爆櫃 A-2"></option>
+                        <option value="藥品櫃 B-1"></option>
+                        <option value="藥品櫃 B-2"></option>
+                        <option value="酸鹼櫃 C-1"></option>
+                        <option value="冷藏冰箱 R-1"></option>
+                        <option value="冷凍冰箱 F-1"></option>
+                    </datalist>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label" id="lblSpec">規格 / 純度</label>
+                    <input type="text" id="addSpec" class="form-control" placeholder="例如：500mL / 99%">
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label" id="lblNote">備註</label>
+                    <input type="text" id="addNote" class="form-control" placeholder="例如：開瓶日期、保管人...">
+                </div>
+
+                <div class="col-12 text-center" id="previewBox" style="display:none;">
+                    <label class="form-label fw-bold text-success">✨ 2D 分子結構預覽：</label><br>
+                    <canvas id="previewCanvas" width="220" height="150" class="chem-canvas shadow-sm p-2"></canvas>
+                </div>
+
+                <div class="col-12">
+                    <button type="submit" class="btn btn-success w-100 fw-bold" id="btnSubmit">儲存建檔 / 更新資料</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 登入管理員彈窗 -->
+<div class="modal fade" id="authModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content p-3">
+      <h5 class="modal-title fw-bold mb-3" id="authModalTitle">🔐 實驗室管理員身份驗證</h5>
+      <input type="password" id="adminPasswordInput" class="form-control mb-3" placeholder="請輸入管理員金鑰 (預設: labadmin2026)">
+      <div class="d-flex justify-content-end gap-2">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" onclick="verifyAdminKey()">確認登入</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 結構圖彈窗 Modal -->
+<div class="modal fade" id="structModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content text-center p-3">
+      <h5 id="modalTitle" class="mb-3">2D 化學結構</h5>
+      <canvas id="modalCanvas" width="350" height="250" class="mx-auto"></canvas>
+      <div id="modalDetails" class="text-muted small mt-2"></div>
+      <button type="button" class="btn btn-secondary mt-3" data-bs-dismiss="modal">關閉</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    let currentLang = 'zh';
+    let currentSearchResults = [];
+    let html5QrCode;
+    let isScanning = false;
+    let currentCabinet = null;
+    let isProcessingScan = false;
+    let isAdmin = false;
+    let adminToken = localStorage.getItem('adminToken') || '';
+
+    let smilesDrawer = new SmilesDrawer.Drawer({ width: 100, height: 70 });
+    let bigDrawer = new SmilesDrawer.Drawer({ width: 350, height: 250 });
+
+    const cabinetMap = {
+        "LOC-A1": "防爆櫃 A-1",
+        "LOC-A2": "防爆櫃 A-2",
+        "LOC-B1": "藥品櫃 B-1",
+        "LOC-B2": "藥品櫃 B-2",
+        "LOC-C1": "酸鹼櫃 C-1",
+        "LOC-R1": "冷藏冰箱 R-1",
+        "LOC-F1": "冷凍冰箱 F-1"
+    };
+
+    const dict = {
+        zh: {
+            langBtn: "English",
+            title: "🧪 實驗室藥品精密管理系統",
+            scanHeader: "相機條碼掃描（支援連續批量入櫃）",
+            btnScanOpen: "開啟相機掃描",
+            btnScanClose: "關閉相機",
+            searchLabel: "🔍 藥品搜尋 (支援名稱模糊搜尋、CAS No.、SMILES 結構式、條碼、擺放位置)",
+            searchPlaceholder: "輸入關鍵字（留空可列出所有藥品）...",
+            btnSearch: "搜尋",
+            resultHeader: "查詢結果",
+            thBarcode: "條碼",
+            thName: "藥品名稱",
+            thCas: "CAS No.",
+            thFormula: "分子式/分子量",
+            thStructure: "2D 化學結構",
+            thSafety: "安衛分類",
+            thLocation: "位置座標",
+            thSpec: "規格",
+            thNote: "備註",
+            thAction: "操作",
+            initialText: "請點擊搜尋或輸入關鍵字",
+            searching: "搜尋中...",
+            notFound: "查無相關藥品資料",
+            addHeader: "➕ 新增 / 修改藥品建檔 (管理員模式)",
+            lblBarcode: "瓶身條碼 *",
+            lblName: "藥品名稱 *",
+            lblCas: "CAS Number",
+            btnFetchCas: "🔍 自動帶入",
+            lblSmiles: "SMILES 結構式",
+            lblFormula: "分子式 (Formula)",
+            lblMw: "分子量 (MW, g/mol)",
+            lblSafety: "安衛分類 *",
+            lblLocation: "擺放位置座標 *",
+            safetyPh: "可選取或直接輸入新分類",
+            locationPh: "可選取或直接輸入新位置",
+            lblSpec: "規格 / 純度",
+            lblNote: "備註",
+            btnSubmit: "儲存建檔 / 更新資料",
+            btnEdit: "編輯",
+            btnDelete: "刪除",
+            confirmDelete: "確定要刪除這筆藥品資料嗎？",
+            saveSuccess: "儲存成功！",
+            saveFail: "儲存失敗",
+            connFail: "連線失敗："
+        },
+        en: {
+            langBtn: "中文",
+            title: "🧪 Precision Lab Chemical Management System",
+            scanHeader: "Barcode Scanner (Batch Storage Supported)",
+            btnScanOpen: "Start Camera Scan",
+            btnScanClose: "Close Camera",
+            searchLabel: "🔍 Chemical Search (Fuzzy Name, CAS No., SMILES, Barcode, Location)",
+            searchPlaceholder: "Type keywords (leave empty to list all)...",
+            btnSearch: "Search",
+            resultHeader: "Search Results",
+            thBarcode: "Barcode",
+            thName: "Chemical Name",
+            thCas: "CAS No.",
+            thFormula: "Formula / MW",
+            thStructure: "2D Structure",
+            thSafety: "Safety Class",
+            thLocation: "Location",
+            thSpec: "Spec",
+            thNote: "Note",
+            thAction: "Action",
+            initialText: "Click search or enter keywords",
+            searching: "Searching...",
+            notFound: "No matching chemical found",
+            addHeader: "➕ Add / Edit Chemical (Admin Mode)",
+            lblBarcode: "Bottle Barcode *",
+            lblName: "Chemical Name *",
+            lblCas: "CAS Number",
+            btnFetchCas: "🔍 Auto-fetch",
+            lblSmiles: "SMILES Structure",
+            lblFormula: "Formula",
+            lblMw: "MW (g/mol)",
+            lblSafety: "Safety Class *",
+            lblLocation: "Location *",
+            safetyPh: "Select or type new safety class",
+            locationPh: "Select or type new location",
+            lblSpec: "Spec / Purity",
+            lblNote: "Note",
+            btnSubmit: "Save / Update Chemical",
+            btnEdit: "Edit",
+            btnDelete: "Delete",
+            confirmDelete: "Are you sure you want to delete this chemical?",
+            saveSuccess: "Saved successfully!",
+            saveFail: "Failed to save",
+            connFail: "Connection failed: "
+        }
+    };
+
+    function showAuthModal() {
+        if (isAdmin) {
+            if (confirm("是否確定登出管理員身份？")) {
+                isAdmin = false;
+                adminToken = '';
+                localStorage.removeItem('adminToken');
+                applyRoleUI();
+            }
+            return;
+        }
+        const m = new bootstrap.Modal(document.getElementById('authModal'));
+        m.show();
+    }
+
+    async function verifyAdminKey() {
+        const key = document.getElementById('adminPasswordInput').value.trim();
+        try {
+            const res = await fetch('/api/verify_key', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: key })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                isAdmin = true;
+                adminToken = key;
+                localStorage.setItem('adminToken', key);
+                bootstrap.Modal.getInstance(document.getElementById('authModal')).hide();
+                document.getElementById('adminPasswordInput').value = '';
+                applyRoleUI();
+                renderResults();
+                alert('🎉 成功登入管理員模式！');
+            } else {
+                alert('密碼錯誤！');
+            }
+        } catch (e) {
+            alert('驗證連線失敗');
+        }
+    }
+
+    function applyRoleUI() {
+        const adminElements = document.querySelectorAll('.admin-only');
+        adminElements.forEach(el => {
+            el.style.display = isAdmin ? 'block' : 'none';
+        });
+        const thAction = document.getElementById('thAction');
+        if (thAction) thAction.style.display = isAdmin ? 'table-cell' : 'none';
+        document.getElementById('btnAuth').innerText = isAdmin ? '🔓 登出管理員' : '🔐 登入管理員';
+    }
+
+    async function downloadBackup() {
+        if (!isAdmin) return;
+        try {
+            const res = await fetch('/api/backup/json', {
+                headers: { 'x-admin-key': adminToken }
+            });
+            if (!res.ok) throw new Error('備份失敗');
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `chemicals_backup_${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        } catch (e) {
+            alert('匯出備份失敗：' + e.message);
+        }
+    }
+
+    function toggleLanguage() {
+        currentLang = currentLang === 'zh' ? 'en' : 'zh';
+        const t = dict[currentLang];
+
+        document.getElementById('langBtn').innerText = t.langBtn;
+        document.getElementById('title').innerText = t.title;
+        document.getElementById('btnScan').innerText = isScanning ? t.btnScanClose : t.btnScanOpen;
+        document.getElementById('searchLabel').innerText = t.searchLabel;
+        document.getElementById('searchInput').placeholder = t.searchPlaceholder;
+        document.getElementById('btnSearch').innerText = t.btnSearch;
+        document.getElementById('resultHeader').innerText = t.resultHeader;
+        document.getElementById('thBarcode').innerText = t.thBarcode;
+        document.getElementById('thName').innerText = t.thName;
+        document.getElementById('thCas').innerText = t.thCas;
+        document.getElementById('thFormula').innerText = t.thFormula;
+        document.getElementById('thStructure').innerText = t.thStructure;
+        document.getElementById('thSafety').innerText = t.thSafety;
+        document.getElementById('thLocation').innerText = t.thLocation;
+        document.getElementById('thSpec').innerText = t.thSpec;
+        document.getElementById('thNote').innerText = t.thNote;
+        document.getElementById('thAction').innerText = t.thAction;
+        document.getElementById('addHeader').innerText = t.addHeader;
+        document.getElementById('lblBarcode').innerText = t.lblBarcode;
+        document.getElementById('lblName').innerText = t.lblName;
+        document.getElementById('lblCas').innerText = t.lblCas;
+        document.getElementById('btnFetchCas').innerText = t.btnFetchCas;
+        document.getElementById('lblSmiles').innerText = t.lblSmiles;
+        document.getElementById('lblFormula').innerText = t.lblFormula;
+        document.getElementById('lblMw').innerText = t.lblMw;
+        document.getElementById('lblSafety').innerText = t.lblSafety;
+        document.getElementById('lblLocation').innerText = t.lblLocation;
+        document.getElementById('addSafety').placeholder = t.safetyPh;
+        document.getElementById('addLocation').placeholder = t.locationPh;
+        document.getElementById('lblSpec').innerText = t.lblSpec;
+        document.getElementById('lblNote').innerText = t.lblNote;
+        document.getElementById('btnSubmit').innerText = t.btnSubmit;
+
+        const initialElem = document.getElementById('initialText');
+        if (initialElem) initialElem.innerText = t.initialText;
+
+        renderResults();
+    }
+
+    function exitCabinetMode() {
+        currentCabinet = null;
+        document.getElementById('cabinetBanner').style.display = 'none';
+        document.getElementById('scanModeBadge').className = 'badge bg-light text-primary';
+        document.getElementById('scanModeBadge').innerText = '一般查詢模式';
+        document.getElementById('scanFeedback').innerText = '';
+    }
+
+    async function handleBarcodeScanned(text) {
+        if (isProcessingScan) return;
+        isProcessingScan = true;
+        const feedback = document.getElementById('scanFeedback');
+        feedback.style.display = 'block';
+
+        if (cabinetMap[text] || text.startsWith("LOC-") || text.startsWith("CAB-")) {
+            currentCabinet = cabinetMap[text] || text;
+            document.getElementById('currentCabinetName').innerText = currentCabinet;
+            document.getElementById('cabinetBanner').style.display = 'block';
+            document.getElementById('scanModeBadge').className = 'badge bg-success text-white';
+            document.getElementById('scanModeBadge').innerText = `入櫃模式 (${currentCabinet})`;
+            feedback.className = 'mt-2 fw-bold text-success';
+            feedback.innerText = `✅ 已鎖定藥櫃：${currentCabinet}！請開始連續掃描藥品條碼。`;
+            
+            setTimeout(() => { isProcessingScan = false; }, 1500);
+            return;
+        }
+
+        if (currentCabinet) {
+            feedback.className = 'mt-2 fw-bold text-primary';
+            feedback.innerText = `🔄 正在將藥品 ${text} 歸入 ${currentCabinet}...`;
+
+            try {
+                const res = await fetch('/api/update_location', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ barcode: text, location: currentCabinet })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    feedback.className = 'mt-2 fw-bold text-success';
+                    feedback.innerText = `🎉【${data.name}】已成功歸入 ${currentCabinet}！`;
+                    searchChemical();
+                } else {
+                    feedback.className = 'mt-2 fw-bold text-danger';
+                    feedback.innerText = `⚠️ 藥品 ${text} 歸位失敗：${data.message}`;
+                }
+            } catch (err) {
+                feedback.className = 'mt-2 fw-bold text-danger';
+                feedback.innerText = `連線失敗：${err.message}`;
+            }
+
+            setTimeout(() => { isProcessingScan = false; }, 1200);
+            return;
+        }
+
+        document.getElementById('searchInput').value = text;
+        searchChemical();
+        toggleScanner();
+        isProcessingScan = false;
+    }
+
+    // 全面相容所有 PubChem 結構欄位名稱之自動帶入函式
+    async function fetchPubChemByCas() {
         const rawCas = document.getElementById('addCas').value.trim();
         const inputName = document.getElementById('addName').value.trim();
         const btn = document.getElementById('btnFetchCas');
@@ -18,7 +510,6 @@ async function fetchPubChemByCas() {
 
         const cleanCas = rawCas.replace(/-/g, '').trim();
 
-        // 策略 1：查詢 CID
         let cid = null;
         for (let queryStr of [rawCas, cleanCas]) {
             if (!queryStr) continue;
@@ -34,7 +525,6 @@ async function fetchPubChemByCas() {
             } catch (e) {}
         }
 
-        // 策略 2：根據 CID 取得完整屬性（囊括所有可能的 SMILES 欄位名稱）
         if (cid) {
             try {
                 const propUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/Title,CanonicalSMILES,IsomericSMILES,ConnectivitySMILES,MolecularFormula,MolecularWeight/JSON`;
@@ -50,7 +540,6 @@ async function fetchPubChemByCas() {
             } catch (e) {}
         }
 
-        // 策略 3（備援）：若 CID 未取得 SMILES，直接以名稱/CAS 撈取
         if (!smiles) {
             const fallbackKeywords = [rawCas, cleanCas, inputName].filter(Boolean);
             for (let kw of fallbackKeywords) {
@@ -89,3 +578,244 @@ async function fetchPubChemByCas() {
             alert('PubChem 未能辨識此 CAS 號碼，請確認號碼是否有誤，或手動填入 SMILES 結構式。');
         }
     }
+
+    function handleKeyPress(e) {
+        if (e.key === 'Enter') searchChemical();
+    }
+
+    async function searchChemical() {
+        const t = dict[currentLang];
+        const query = document.getElementById('searchInput').value.trim();
+        const tbody = document.getElementById('resultBody');
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center text-primary">${t.searching}</td></tr>`;
+
+        try {
+            const params = new URLSearchParams({ q: query });
+            const res = await fetch('/api/search?' + params.toString());
+            
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            
+            currentSearchResults = await res.json();
+            renderResults();
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="10" class="text-center text-danger">${t.connFail} ${err.message}</td></tr>`;
+        }
+    }
+
+    function renderResults() {
+        const t = dict[currentLang];
+        const tbody = document.getElementById('resultBody');
+        tbody.innerHTML = '';
+
+        if (!currentSearchResults || currentSearchResults.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" class="text-center text-danger" id="initialText">${t.notFound}</td></tr>`;
+            return;
+        }
+
+        currentSearchResults.forEach((item, index) => {
+            const tr = document.createElement('tr');
+            
+            let structHtml = '-';
+            if (item.smiles && item.smiles !== '-') {
+                structHtml = `<canvas id="canvas-${index}" width="100" height="70" class="chem-canvas"></canvas>`;
+            }
+
+            const formulaMw = (item.formula !== '-' || item.mw !== '-') 
+                ? `<div><b>${item.formula}</b></div><small class="text-muted">${item.mw} g/mol</small>` 
+                : '-';
+
+            let actionHtml = '';
+            if (isAdmin) {
+                actionHtml = `
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="editChemical(${index})">${t.btnEdit}</button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteChemical('${item.barcode}')">${t.btnDelete}</button>
+                    </td>
+                `;
+            }
+
+            tr.innerHTML = `
+                <td><code>${item.barcode}</code></td>
+                <td><b>${item.name}</b></td>
+                <td>${item.cas_no}</td>
+                <td>${formulaMw}</td>
+                <td class="text-center">${structHtml}</td>
+                <td><span class="badge bg-warning text-dark">${item.safety_class}</span></td>
+                <td><span class="badge bg-info text-dark">${item.location}</span></td>
+                <td>${item.spec}</td>
+                <td>${item.note}</td>
+                ${actionHtml}
+            `;
+            tbody.appendChild(tr);
+
+            if (item.smiles && item.smiles !== '-') {
+                const cvs = document.getElementById(`canvas-${index}`);
+                if (cvs) {
+                    cvs.onclick = () => showBigStruct(item.name, item.smiles, item.formula, item.mw);
+                }
+            }
+        });
+
+        currentSearchResults.forEach((item, index) => {
+            if (item.smiles && item.smiles !== '-') {
+                SmilesDrawer.parse(item.smiles, function (tree) {
+                    smilesDrawer.draw(tree, `canvas-${index}`, 'light', false);
+                });
+            }
+        });
+    }
+
+    function showBigStruct(name, smiles, formula, mw) {
+        document.getElementById('modalTitle').innerText = name + ' - 2D 化學結構';
+        document.getElementById('modalDetails').innerHTML = `
+            <div><b>SMILES:</b> <code>${smiles}</code></div>
+            <div><b>分子式:</b> ${formula} | <b>分子量:</b> ${mw} g/mol</div>
+        `;
+        SmilesDrawer.parse(smiles, function (tree) {
+            bigDrawer.draw(tree, 'modalCanvas', 'light', false);
+        });
+        const structModal = new bootstrap.Modal(document.getElementById('structModal'));
+        structModal.show();
+    }
+
+    function previewStructure() {
+        const smiles = document.getElementById('addSmiles').value.trim();
+        const box = document.getElementById('previewBox');
+        if (!smiles || smiles === '-') {
+            box.style.display = 'none';
+            return;
+        }
+        box.style.display = 'block';
+        SmilesDrawer.parse(smiles, function (tree) {
+            let pDrawer = new SmilesDrawer.Drawer({ width: 220, height: 150 });
+            pDrawer.draw(tree, 'previewCanvas', 'light', false);
+        });
+    }
+
+    function editChemical(index) {
+        if (!isAdmin) return;
+        const item = currentSearchResults[index];
+        document.getElementById('addBarcode').value = item.barcode;
+        document.getElementById('addName').value = item.name;
+        document.getElementById('addCas').value = item.cas_no === '-' ? '' : item.cas_no;
+        document.getElementById('addSmiles').value = item.smiles === '-' ? '' : item.smiles;
+        document.getElementById('addFormula').value = item.formula === '-' ? '' : item.formula;
+        document.getElementById('addMw').value = item.mw === '-' ? '' : item.mw;
+        document.getElementById('addSafety').value = item.safety_class === '-' ? '' : item.safety_class;
+        document.getElementById('addLocation').value = item.location === '-' ? '' : item.location;
+        document.getElementById('addSpec').value = item.spec === '-' ? '' : item.spec;
+        document.getElementById('addNote').value = item.note === '-' ? '' : item.note;
+        
+        previewStructure();
+        document.getElementById('adminFormSection').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function deleteChemical(barcode) {
+        if (!isAdmin) return;
+        const t = dict[currentLang];
+        if (!confirm(t.confirmDelete)) return;
+
+        try {
+            const res = await fetch('/api/delete_chemical/' + encodeURIComponent(barcode), { 
+                method: 'DELETE',
+                headers: { 'x-admin-key': adminToken }
+            });
+            if (res.ok) searchChemical();
+            else alert('刪除失敗：權限不足');
+        } catch (err) {
+            alert(t.connFail);
+        }
+    }
+
+    async function addChemical(e) {
+        e.preventDefault();
+        if (!isAdmin) {
+            alert('請先登入管理員！');
+            return;
+        }
+        const t = dict[currentLang];
+        const barcodeInput = document.getElementById('addBarcode').value.trim();
+
+        const payload = {
+            barcode: barcodeInput,
+            name: document.getElementById('addName').value.trim(),
+            cas_no: document.getElementById('addCas').value.trim(),
+            smiles: document.getElementById('addSmiles').value.trim(),
+            formula: document.getElementById('addFormula').value.trim(),
+            mw: document.getElementById('addMw').value.trim(),
+            safety_class: document.getElementById('addSafety').value.trim(),
+            location: document.getElementById('addLocation').value.trim(),
+            spec: document.getElementById('addSpec').value.trim(),
+            note: document.getElementById('addNote').value.trim()
+        };
+
+        try {
+            const res = await fetch('/api/add_chemical', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'x-admin-key': adminToken
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                alert(t.saveSuccess);
+                document.getElementById('searchInput').value = barcodeInput;
+                document.getElementById('addForm').reset();
+                document.getElementById('previewBox').style.display = 'none';
+                searchChemical();
+            } else {
+                alert(t.saveFail + '：權限不足或資料庫錯誤');
+            }
+        } catch (err) {
+            alert(t.connFail + err.message);
+        }
+    }
+
+    function toggleScanner() {
+        const t = dict[currentLang];
+        if (!isScanning) {
+            document.getElementById('reader').style.display = 'block';
+            html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 150 } },
+                (decodedText) => {
+                    handleBarcodeScanned(decodedText);
+                },
+                (errorMessage) => {}
+            );
+            document.getElementById('btnScan').innerText = t.btnScanClose;
+            document.getElementById('btnScan').classList.replace('btn-primary', 'btn-danger');
+            isScanning = true;
+        } else {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    document.getElementById('reader').style.display = 'none';
+                    document.getElementById('btnScan').innerText = t.btnScanOpen;
+                    document.getElementById('btnScan').classList.replace('btn-danger', 'btn-primary');
+                    isScanning = false;
+                });
+            }
+        }
+    }
+
+    if (adminToken) {
+        fetch('/api/verify_key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: adminToken })
+        }).then(r => r.json()).then(d => {
+            if (d.status === 'success') {
+                isAdmin = true;
+                applyRoleUI();
+            } else {
+                localStorage.removeItem('adminToken');
+            }
+        });
+    }
+</script>
+
+</body>
+</html>

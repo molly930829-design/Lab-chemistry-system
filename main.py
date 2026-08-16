@@ -4,15 +4,11 @@ from pydantic import BaseModel
 from typing import Optional
 import os
 import psycopg2
-import urllib.request
-import json
-import csv
-import io
 
 app = FastAPI()
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
-ADMIN_KEY = os.environ.get("ADMIN_KEY", "labadmin2026") # 預設管理員密碼，可在 Render 環境變數自訂
+ADMIN_KEY = os.environ.get("ADMIN_KEY", "labadmin2026") # 預設管理員密碼
 
 def get_db_connection():
     if DATABASE_URL:
@@ -22,11 +18,30 @@ def get_db_connection():
         import sqlite3
         return sqlite3.connect("lab_chemicals.db")
 
+# 自動升級資料表欄位（修復 500 錯誤）
 def init_db():
-    if not DATABASE_URL:
-        import sqlite3
-        conn = sqlite3.connect("lab_chemicals.db")
-        cursor = conn.cursor()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    if DATABASE_URL:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chemicals (
+                barcode VARCHAR(255) PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                cas_no VARCHAR(255),
+                smiles VARCHAR(255),
+                formula VARCHAR(255),
+                mw VARCHAR(255),
+                safety_class VARCHAR(255),
+                location VARCHAR(255),
+                spec VARCHAR(255),
+                note VARCHAR(255)
+            );
+        """)
+        # 自動為舊資料庫補上 formula 與 mw 欄位
+        cursor.execute("ALTER TABLE chemicals ADD COLUMN IF NOT EXISTS formula VARCHAR(255);")
+        cursor.execute("ALTER TABLE chemicals ADD COLUMN IF NOT EXISTS mw VARCHAR(255);")
+    else:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS chemicals (
                 barcode TEXT PRIMARY KEY,
@@ -41,26 +56,15 @@ def init_db():
                 note TEXT
             )
         """)
-        conn.commit()
-        conn.close()
-        return
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS chemicals (
-            barcode VARCHAR(255) PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            cas_no VARCHAR(255),
-            smiles VARCHAR(255),
-            formula VARCHAR(255),
-            mw VARCHAR(255),
-            safety_class VARCHAR(255),
-            location VARCHAR(255),
-            spec VARCHAR(255),
-            note VARCHAR(255)
-        );
-    """)
+        try:
+            cursor.execute("ALTER TABLE chemicals ADD COLUMN formula TEXT;")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE chemicals ADD COLUMN mw TEXT;")
+        except Exception:
+            pass
+            
     conn.commit()
     cursor.close()
     conn.close()
@@ -87,10 +91,9 @@ class UpdateLocationPayload(BaseModel):
 def read_root():
     return FileResponse("index.html")
 
-# 驗證管理員權限
 def verify_admin(x_admin_key: Optional[str] = Header(None)):
     if x_admin_key != ADMIN_KEY:
-        raise HTTPException(status_code=403, detail="權限不足：管理員密碼錯誤")
+        raise HTTPException(status_code=403, detail="權限不足")
 
 @app.post("/api/verify_key")
 def check_key(payload: dict):
@@ -153,7 +156,6 @@ def search_chemical(q: str = Query("")):
         })
     return results
 
-# 一般成員即可呼叫：掃描批量歸位
 @app.post("/api/update_location")
 def update_chemical_location(payload: UpdateLocationPayload):
     conn = get_db_connection()
@@ -179,7 +181,6 @@ def update_chemical_location(payload: UpdateLocationPayload):
         conn.close()
         return {"status": "error", "message": str(e)}
 
-# 管理員專屬：新增/更新藥品
 @app.post("/api/add_chemical")
 def add_chemical(chem: Chemical, x_admin_key: Optional[str] = Header(None)):
     verify_admin(x_admin_key)
@@ -215,7 +216,6 @@ def add_chemical(chem: Chemical, x_admin_key: Optional[str] = Header(None)):
         conn.close()
         return {"status": "error", "message": str(e)}
 
-# 管理員專屬：刪除藥品
 @app.delete("/api/delete_chemical/{barcode}")
 def delete_chemical(barcode: str, x_admin_key: Optional[str] = Header(None)):
     verify_admin(x_admin_key)
@@ -230,7 +230,6 @@ def delete_chemical(barcode: str, x_admin_key: Optional[str] = Header(None)):
     conn.close()
     return {"status": "success"}
 
-# 資料庫自動備份與匯出 (JSON 備份)
 @app.get("/api/backup/json")
 def backup_database_json(x_admin_key: Optional[str] = Header(None)):
     verify_admin(x_admin_key)

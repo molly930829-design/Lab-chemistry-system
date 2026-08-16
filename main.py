@@ -70,31 +70,38 @@ class Chemical(BaseModel):
     spec: Optional[str] = ""
     note: Optional[str] = ""
 
+class UpdateLocationPayload(BaseModel):
+    barcode: str
+    location: str
+
 @app.get("/")
 def read_root():
     return FileResponse("index.html")
 
-# 後端代理 PubChem 查詢 API (自動支援 CAS 號碼檢索)
-@app.get("/api/pubchem/{cas}")
-def fetch_pubchem(cas: str):
-    clean_cas = cas.replace("-", "").strip()
-    urls = [
-        f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{cas.strip()}/property/Title,IsomericSMILES,CanonicalSMILES/JSON",
-        f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{clean_cas}/property/Title,IsomericSMILES,CanonicalSMILES/JSON"
-    ]
-    for url in urls:
-        try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=5) as response:
-                data = json.loads(response.read().decode())
-                props = data["PropertyTable"]["Properties"][0]
-                smiles = props.get("IsomericSMILES") or props.get("CanonicalSMILES") or ""
-                name = props.get("Title") or ""
-                if smiles:
-                    return {"status": "success", "smiles": smiles, "name": name}
-        except Exception:
-            continue
-    return {"status": "error", "message": "PubChem 查無此 CAS 資料"}
+@app.post("/api/update_location")
+def update_chemical_location(payload: UpdateLocationPayload):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        if DATABASE_URL:
+            cursor.execute("UPDATE chemicals SET location = %s WHERE barcode = %s RETURNING name;", (payload.location, payload.barcode))
+            row = cursor.fetchone()
+        else:
+            cursor.execute("UPDATE chemicals SET location = ? WHERE barcode = ?", (payload.location, payload.barcode))
+            cursor.execute("SELECT name FROM chemicals WHERE barcode = ?", (payload.barcode,))
+            row = cursor.fetchone()
+            
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        if row:
+            return {"status": "success", "name": row[0]}
+        else:
+            return {"status": "error", "message": "此條碼未建檔"}
+    except Exception as e:
+        conn.close()
+        return {"status": "error", "message": str(e)}
 
 @app.get("/api/search")
 def search_chemical(q: str = Query("")):

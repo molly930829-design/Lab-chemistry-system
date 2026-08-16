@@ -13,6 +13,7 @@
         #reader { width: 100%; max-width: 400px; margin: 0 auto; display: none; }
         .lang-btn { position: absolute; top: 25px; right: 30px; }
         .chem-canvas { cursor: pointer; background: #fff; border: 1px solid #dee2e6; border-radius: 6px; }
+        .cabinet-banner { display: none; background: #e8f5e9; border: 2px dashed #2e7d32; border-radius: 8px; padding: 12px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -24,10 +25,23 @@
 
     <!-- 相機掃描區 -->
     <div class="card mb-4">
-        <div class="card-header bg-primary text-white fw-bold" id="scanHeader">相機條碼掃描</div>
+        <div class="card-header bg-primary text-white fw-bold d-flex justify-content-between align-items-center">
+            <span id="scanHeader">相機條碼掃描（支援連續批量入櫃）</span>
+            <span class="badge bg-light text-primary" id="scanModeBadge">一般查詢模式</span>
+        </div>
         <div class="card-body text-center">
+            <!-- 批量入櫃提示橫幅 -->
+            <div id="cabinetBanner" class="cabinet-banner">
+                <h5 class="text-success fw-bold mb-1">📍 批量入櫃中：<span id="currentCabinetName">未鎖定</span></h5>
+                <small class="text-muted">已鎖定目標藥櫃！接下來掃描的所有藥品將直接歸入此櫃。</small>
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-outline-danger" onclick="exitCabinetMode()">結束入櫃模式</button>
+                </div>
+            </div>
+
             <button class="btn btn-primary w-100 mb-2" id="btnScan" onclick="toggleScanner()">開啟相機掃描</button>
             <div id="reader"></div>
+            <div id="scanFeedback" class="mt-2 fw-bold text-success" style="display:none;"></div>
         </div>
     </div>
 
@@ -77,14 +91,14 @@
             <div class="col-md-4">
                 <label class="form-label fw-bold" id="lblCas">CAS Number</label>
                 <div class="input-group">
-                    <input type="text" id="addCas" class="form-control" placeholder="例如：64-17-5">
+                    <input type="text" id="addCas" class="form-control" placeholder="例如：67-64-1">
                     <button class="btn btn-primary" type="button" onclick="fetchPubChemByCas()" id="btnFetchCas">🔍 自動帶入</button>
                 </div>
             </div>
 
             <div class="col-md-4">
                 <label class="form-label fw-bold" id="lblName">藥品名稱 *</label>
-                <input type="text" id="addName" class="form-control" placeholder="例如：Ethanol" required>
+                <input type="text" id="addName" class="form-control" placeholder="例如：Acetone" required>
             </div>
 
             <div class="col-md-6">
@@ -159,14 +173,27 @@
     let currentSearchResults = [];
     let html5QrCode;
     let isScanning = false;
+    let currentCabinet = null; // 當前鎖定的藥櫃位置
+    let isProcessingScan = false; // 防止重複掃描防抖
     let smilesDrawer = new SmilesDrawer.Drawer({ width: 100, height: 70 });
     let bigDrawer = new SmilesDrawer.Drawer({ width: 350, height: 250 });
+
+    // 藥櫃條碼對照表（條碼開頭為 LOC- 或 CAB-，也可以自訂條碼名稱）
+    const cabinetMap = {
+        "LOC-A1": "防爆櫃 A-1",
+        "LOC-A2": "防爆櫃 A-2",
+        "LOC-B1": "藥品櫃 B-1",
+        "LOC-B2": "藥品櫃 B-2",
+        "LOC-C1": "酸鹼櫃 C-1",
+        "LOC-R1": "冷藏冰箱 R-1",
+        "LOC-F1": "冷凍冰箱 F-1"
+    };
 
     const dict = {
         zh: {
             langBtn: "English",
             title: "🧪 實驗室藥品精密管理系統",
-            scanHeader: "相機條碼掃描",
+            scanHeader: "相機條碼掃描（支援連續批量入櫃）",
             btnScanOpen: "開啟相機掃描",
             btnScanClose: "關閉相機",
             searchLabel: "🔍 藥品搜尋 (支援名稱模糊搜尋、CAS No.、SMILES 結構式、條碼、擺放位置)",
@@ -208,7 +235,7 @@
         en: {
             langBtn: "中文",
             title: "🧪 Precision Lab Chemical Management System",
-            scanHeader: "Barcode Scanner",
+            scanHeader: "Barcode Scanner (Batch Storage Supported)",
             btnScanOpen: "Start Camera Scan",
             btnScanClose: "Close Camera",
             searchLabel: "🔍 Chemical Search (Fuzzy Name, CAS No., SMILES, Barcode, Location)",
@@ -255,7 +282,6 @@
 
         document.getElementById('langBtn').innerText = t.langBtn;
         document.getElementById('title').innerText = t.title;
-        document.getElementById('scanHeader').innerText = t.scanHeader;
         document.getElementById('btnScan').innerText = isScanning ? t.btnScanClose : t.btnScanOpen;
         document.getElementById('searchLabel').innerText = t.searchLabel;
         document.getElementById('searchInput').placeholder = t.searchPlaceholder;
@@ -288,6 +314,72 @@
         if (initialElem) initialElem.innerText = t.initialText;
 
         renderResults();
+    }
+
+    // 結束藥櫃入庫模式
+    function exitCabinetMode() {
+        currentCabinet = null;
+        document.getElementById('cabinetBanner').style.display = 'none';
+        document.getElementById('scanModeBadge').className = 'badge bg-light text-primary';
+        document.getElementById('scanModeBadge').innerText = '一般查詢模式';
+        document.getElementById('scanFeedback').innerText = '';
+    }
+
+    // 處理掃描到的條碼
+    async function handleBarcodeScanned(text) {
+        if (isProcessingScan) return;
+        isProcessingScan = true;
+        const feedback = document.getElementById('scanFeedback');
+        feedback.style.display = 'block';
+
+        // 判斷是否為藥櫃條碼（例如 LOC-A1 或包含在對照表中）
+        if (cabinetMap[text] || text.startsWith("LOC-") || text.startsWith("CAB-")) {
+            currentCabinet = cabinetMap[text] || text;
+            document.getElementById('currentCabinetName').innerText = currentCabinet;
+            document.getElementById('cabinetBanner').style.display = 'block';
+            document.getElementById('scanModeBadge').className = 'badge bg-success text-white';
+            document.getElementById('scanModeBadge').innerText = `入櫃模式 (${currentCabinet})`;
+            feedback.className = 'mt-2 fw-bold text-success';
+            feedback.innerText = `✅ 已鎖定藥櫃：${currentCabinet}！請開始連續掃描藥品條碼。`;
+            
+            setTimeout(() => { isProcessingScan = false; }, 1500);
+            return;
+        }
+
+        // 如果目前處於「入櫃模式」，直接將該藥品歸入當前藥櫃
+        if (currentCabinet) {
+            feedback.className = 'mt-2 fw-bold text-primary';
+            feedback.innerText = `🔄 正在將藥品 ${text} 歸入 ${currentCabinet}...`;
+
+            try {
+                const res = await fetch('/api/update_location', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ barcode: text, location: currentCabinet })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    feedback.className = 'mt-2 fw-bold text-success';
+                    feedback.innerText = `🎉【${data.name}】已成功歸入 ${currentCabinet}！`;
+                    searchChemical(); // 刷新表格
+                } else {
+                    feedback.className = 'mt-2 fw-bold text-danger';
+                    feedback.innerText = `⚠️ 藥品 ${text} 歸位失敗：${data.message}`;
+                }
+            } catch (err) {
+                feedback.className = 'mt-2 fw-bold text-danger';
+                feedback.innerText = `連線失敗：${err.message}`;
+            }
+
+            setTimeout(() => { isProcessingScan = false; }, 1200);
+            return;
+        }
+
+        // 一般查詢模式
+        document.getElementById('searchInput').value = text;
+        searchChemical();
+        toggleScanner(); // 查到後自動關閉相機
+        isProcessingScan = false;
     }
 
     async function fetchPubChemByCas() {
@@ -509,9 +601,7 @@
                 { facingMode: "environment" },
                 { fps: 10, qrbox: { width: 250, height: 150 } },
                 (decodedText) => {
-                    document.getElementById('searchInput').value = decodedText;
-                    searchChemical();
-                    toggleScanner();
+                    handleBarcodeScanned(decodedText);
                 },
                 (errorMessage) => {}
             );

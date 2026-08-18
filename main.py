@@ -8,7 +8,7 @@ import psycopg2
 app = FastAPI()
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
-ADMIN_KEY = os.environ.get("ADMIN_KEY", "labadmin2026") # 預設管理員密碼
+ADMIN_KEY = os.environ.get("ADMIN_KEY", "labadmin2026") # 預設管理員金鑰
 
 def get_db_connection():
     if DATABASE_URL:
@@ -18,7 +18,6 @@ def get_db_connection():
         import sqlite3
         return sqlite3.connect("lab_chemicals.db")
 
-# 自動升級資料表欄位（修復 500 錯誤）
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -38,7 +37,6 @@ def init_db():
                 note VARCHAR(255)
             );
         """)
-        # 自動為舊資料庫補上 formula 與 mw 欄位
         cursor.execute("ALTER TABLE chemicals ADD COLUMN IF NOT EXISTS formula VARCHAR(255);")
         cursor.execute("ALTER TABLE chemicals ADD COLUMN IF NOT EXISTS mw VARCHAR(255);")
     else:
@@ -93,7 +91,7 @@ def read_root():
 
 def verify_admin(x_admin_key: Optional[str] = Header(None)):
     if x_admin_key != ADMIN_KEY:
-        raise HTTPException(status_code=403, detail="權限不足")
+        raise HTTPException(status_code=403, detail="權限不足：需要管理員權限")
 
 @app.post("/api/verify_key")
 def check_key(payload: dict):
@@ -156,6 +154,7 @@ def search_chemical(q: str = Query("")):
         })
     return results
 
+# 一般使用者即可呼叫：連續掃描批量入櫃
 @app.post("/api/update_location")
 def update_chemical_location(payload: UpdateLocationPayload):
     conn = get_db_connection()
@@ -181,11 +180,26 @@ def update_chemical_location(payload: UpdateLocationPayload):
         conn.close()
         return {"status": "error", "message": str(e)}
 
-@app.post("/api/add_chemical")
-def add_chemical(chem: Chemical, x_admin_key: Optional[str] = Header(None)):
-    verify_admin(x_admin_key)
+# 一般使用者可編輯已入庫藥品；管理員則可新增全新藥品
+@app.post("/api/save_chemical")
+def save_chemical(chem: Chemical, x_admin_key: Optional[str] = Header(None)):
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # 檢查條碼是否存在
+    if DATABASE_URL:
+        cursor.execute("SELECT barcode FROM chemicals WHERE barcode = %s;", (chem.barcode,))
+    else:
+        cursor.execute("SELECT barcode FROM chemicals WHERE barcode = ?;", (chem.barcode,))
+    exists = cursor.fetchone() is not None
+
+    # 如果是全新入庫，必須驗證管理員權限
+    if not exists:
+        if x_admin_key != ADMIN_KEY:
+            cursor.close()
+            conn.close()
+            raise HTTPException(status_code=403, detail="全新藥品建檔入庫需要管理員權限！請先登入管理員。")
+
     try:
         if DATABASE_URL:
             cursor.execute("""
@@ -211,11 +225,12 @@ def add_chemical(chem: Chemical, x_admin_key: Optional[str] = Header(None)):
         conn.commit()
         cursor.close()
         conn.close()
-        return {"status": "success"}
+        return {"status": "success", "mode": "update" if exists else "insert"}
     except Exception as e:
         conn.close()
         return {"status": "error", "message": str(e)}
 
+# 刪除藥品（僅限管理員）
 @app.delete("/api/delete_chemical/{barcode}")
 def delete_chemical(barcode: str, x_admin_key: Optional[str] = Header(None)):
     verify_admin(x_admin_key)
@@ -230,6 +245,7 @@ def delete_chemical(barcode: str, x_admin_key: Optional[str] = Header(None)):
     conn.close()
     return {"status": "success"}
 
+# 匯出資料庫備份（僅限管理員）
 @app.get("/api/backup/json")
 def backup_database_json(x_admin_key: Optional[str] = Header(None)):
     verify_admin(x_admin_key)

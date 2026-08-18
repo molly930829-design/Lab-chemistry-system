@@ -35,6 +35,7 @@
             <span class="badge bg-light text-primary" id="scanModeBadge">一般查詢模式</span>
         </div>
         <div class="card-body text-center">
+            <!-- 批量入櫃提示橫幅 -->
             <div id="cabinetBanner" class="cabinet-banner">
                 <h5 class="text-success fw-bold mb-1">📍 批量入櫃中：<span id="currentCabinetName">未鎖定</span></h5>
                 <small class="text-muted">已鎖定目標藥櫃！接下來掃描的所有藥品將直接歸入此櫃。</small>
@@ -58,7 +59,7 @@
         </div>
     </div>
 
-    <!-- 查詢結果表格 -->
+    <!-- 查詢結果表格（所有使用者皆可點擊編輯，管理員額外擁有刪除按鈕） -->
     <h4 id="resultHeader">查詢結果</h4>
     <div class="table-responsive mb-4">
         <table class="table table-bordered table-hover align-middle">
@@ -73,7 +74,7 @@
                     <th id="thLocation">位置座標</th>
                     <th id="thSpec">規格</th>
                     <th id="thNote">備註</th>
-                    <th id="thAction" class="admin-only">操作</th>
+                    <th id="thAction">操作</th>
                 </tr>
             </thead>
             <tbody id="resultBody">
@@ -82,15 +83,19 @@
         </table>
     </div>
 
-    <!-- 管理員專屬：新增 / 修改藥品建檔表單 -->
-    <div class="admin-only" id="adminFormSection">
+    <!-- 藥品編輯 / 新增表單區塊 -->
+    <div id="formSection">
         <hr>
-        <h4 class="mb-3" id="addHeader">➕ 新增 / 修改藥品建檔 (管理員模式)</h4>
-        <form id="addForm" onsubmit="addChemical(event)">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 id="formHeaderTitle" class="mb-0">📝 編輯已入庫藥品資料</h4>
+            <span id="formRoleBadge" class="badge bg-secondary">所有人皆可編輯已入庫藥品</span>
+        </div>
+        <form id="addForm" onsubmit="saveChemical(event)">
             <div class="row g-3">
                 <div class="col-md-4">
                     <label class="form-label fw-bold" id="lblBarcode">瓶身條碼 *</label>
                     <input type="text" id="addBarcode" class="form-control" placeholder="例如：CHEM-00001" required>
+                    <small class="text-muted" id="barcodeTip">（若為新條碼入庫，需管理員權限）</small>
                 </div>
                 
                 <div class="col-md-4">
@@ -159,13 +164,14 @@
                     <input type="text" id="addNote" class="form-control" placeholder="例如：開瓶日期、保管人...">
                 </div>
 
+                <!-- 2D 結構即時預覽畫布 -->
                 <div class="col-12 text-center" id="previewBox" style="display:none;">
                     <label class="form-label fw-bold text-success">✨ 2D 分子結構預覽：</label><br>
                     <canvas id="previewCanvas" width="220" height="150" class="chem-canvas shadow-sm p-2"></canvas>
                 </div>
 
                 <div class="col-12">
-                    <button type="submit" class="btn btn-success w-100 fw-bold" id="btnSubmit">儲存建檔 / 更新資料</button>
+                    <button type="submit" class="btn btn-success w-100 fw-bold" id="btnSubmit">💾 儲存修改 / 入庫建檔</button>
                 </div>
             </div>
         </form>
@@ -176,7 +182,7 @@
 <div class="modal fade" id="authModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content p-3">
-      <h5 class="modal-title fw-bold mb-3" id="authModalTitle">🔐 實驗室管理員身份驗證</h5>
+      <h5 class="modal-title fw-bold mb-3">🔐 實驗室管理員身份驗證</h5>
       <input type="password" id="adminPasswordInput" class="form-control mb-3" placeholder="請輸入管理員金鑰 (預設: labadmin2026)">
       <div class="d-flex justify-content-end gap-2">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -246,7 +252,8 @@
             initialText: "請點擊搜尋或輸入關鍵字",
             searching: "搜尋中...",
             notFound: "查無相關藥品資料",
-            addHeader: "➕ 新增 / 修改藥品建檔 (管理員模式)",
+            formTitleUser: "📝 編輯已入庫藥品資料",
+            formTitleAdmin: "➕ 新增入庫 / 編輯藥品 (管理員模式)",
             lblBarcode: "瓶身條碼 *",
             lblName: "藥品名稱 *",
             lblCas: "CAS Number",
@@ -260,7 +267,7 @@
             locationPh: "可選取或直接輸入新位置",
             lblSpec: "規格 / 純度",
             lblNote: "備註",
-            btnSubmit: "儲存建檔 / 更新資料",
+            btnSubmit: "💾 儲存修改 / 入庫建檔",
             btnEdit: "編輯",
             btnDelete: "刪除",
             confirmDelete: "確定要刪除這筆藥品資料嗎？",
@@ -291,7 +298,8 @@
             initialText: "Click search or enter keywords",
             searching: "Searching...",
             notFound: "No matching chemical found",
-            addHeader: "➕ Add / Edit Chemical (Admin Mode)",
+            formTitleUser: "📝 Edit Existing Chemical",
+            formTitleAdmin: "➕ Add New / Edit Chemical (Admin Mode)",
             lblBarcode: "Bottle Barcode *",
             lblName: "Chemical Name *",
             lblCas: "CAS Number",
@@ -305,7 +313,7 @@
             locationPh: "Select or type new location",
             lblSpec: "Spec / Purity",
             lblNote: "Note",
-            btnSubmit: "Save / Update Chemical",
+            btnSubmit: "💾 Save Changes / Stock In",
             btnEdit: "Edit",
             btnDelete: "Delete",
             confirmDelete: "Are you sure you want to delete this chemical?",
@@ -322,6 +330,7 @@
                 adminToken = '';
                 localStorage.removeItem('adminToken');
                 applyRoleUI();
+                renderResults();
             }
             return;
         }
@@ -346,7 +355,7 @@
                 document.getElementById('adminPasswordInput').value = '';
                 applyRoleUI();
                 renderResults();
-                alert('🎉 成功登入管理員模式！');
+                alert('🎉 成功登入管理員模式！您現在可新增全新藥品入庫及刪除藥品。');
             } else {
                 alert('密碼錯誤！');
             }
@@ -360,9 +369,19 @@
         adminElements.forEach(el => {
             el.style.display = isAdmin ? 'block' : 'none';
         });
-        const thAction = document.getElementById('thAction');
-        if (thAction) thAction.style.display = isAdmin ? 'table-cell' : 'none';
         document.getElementById('btnAuth').innerText = isAdmin ? '🔓 登出管理員' : '🔐 登入管理員';
+        
+        const titleElem = document.getElementById('formHeaderTitle');
+        const badgeElem = document.getElementById('formRoleBadge');
+        if (isAdmin) {
+            titleElem.innerText = dict[currentLang].formTitleAdmin;
+            badgeElem.className = 'badge bg-success';
+            badgeElem.innerText = '管理員模式：可新增入庫全新藥品';
+        } else {
+            titleElem.innerText = dict[currentLang].formTitleUser;
+            badgeElem.className = 'badge bg-secondary';
+            badgeElem.innerText = '所有人皆可編輯已入庫藥品';
+        }
     }
 
     async function downloadBackup() {
@@ -406,7 +425,6 @@
         document.getElementById('thSpec').innerText = t.thSpec;
         document.getElementById('thNote').innerText = t.thNote;
         document.getElementById('thAction').innerText = t.thAction;
-        document.getElementById('addHeader').innerText = t.addHeader;
         document.getElementById('lblBarcode').innerText = t.lblBarcode;
         document.getElementById('lblName').innerText = t.lblName;
         document.getElementById('lblCas').innerText = t.lblCas;
@@ -425,6 +443,7 @@
         const initialElem = document.getElementById('initialText');
         if (initialElem) initialElem.innerText = t.initialText;
 
+        applyRoleUI();
         renderResults();
     }
 
@@ -489,7 +508,6 @@
         isProcessingScan = false;
     }
 
-    // 全面相容所有 PubChem 結構欄位名稱之自動帶入函式
     async function fetchPubChemByCas() {
         const rawCas = document.getElementById('addCas').value.trim();
         const inputName = document.getElementById('addName').value.trim();
@@ -624,15 +642,17 @@
                 ? `<div><b>${item.formula}</b></div><small class="text-muted">${item.mw} g/mol</small>` 
                 : '-';
 
-            let actionHtml = '';
-            if (isAdmin) {
-                actionHtml = `
-                    <td>
-                        <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="editChemical(${index})">${t.btnEdit}</button>
-                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteChemical('${item.barcode}')">${t.btnDelete}</button>
-                    </td>
-                `;
-            }
+            // 所有人皆能點擊「編輯」，僅管理員會看到「刪除」按鈕
+            let deleteBtnHtml = isAdmin 
+                ? `<button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteChemical('${item.barcode}')">${t.btnDelete}</button>` 
+                : '';
+
+            let actionHtml = `
+                <td>
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="editChemical(${index})">${t.btnEdit}</button>
+                    ${deleteBtnHtml}
+                </td>
+            `;
 
             tr.innerHTML = `
                 <td><code>${item.barcode}</code></td>
@@ -692,8 +712,8 @@
         });
     }
 
+    // 所有人皆可觸發「編輯」已入庫藥品
     function editChemical(index) {
-        if (!isAdmin) return;
         const item = currentSearchResults[index];
         document.getElementById('addBarcode').value = item.barcode;
         document.getElementById('addName').value = item.name;
@@ -707,7 +727,7 @@
         document.getElementById('addNote').value = item.note === '-' ? '' : item.note;
         
         previewStructure();
-        document.getElementById('adminFormSection').scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('formSection').scrollIntoView({ behavior: 'smooth' });
     }
 
     async function deleteChemical(barcode) {
@@ -727,12 +747,8 @@
         }
     }
 
-    async function addChemical(e) {
+    async function saveChemical(e) {
         e.preventDefault();
-        if (!isAdmin) {
-            alert('請先登入管理員！');
-            return;
-        }
         const t = dict[currentLang];
         const barcodeInput = document.getElementById('addBarcode').value.trim();
 
@@ -750,7 +766,7 @@
         };
 
         try {
-            const res = await fetch('/api/add_chemical', {
+            const res = await fetch('/api/save_chemical', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -760,13 +776,15 @@
             });
 
             if (res.ok) {
-                alert(t.saveSuccess);
+                const data = await res.json();
+                alert(data.mode === 'insert' ? '🎉 新藥品入庫成功！' : '✅ 藥品資料修改已儲存！');
                 document.getElementById('searchInput').value = barcodeInput;
                 document.getElementById('addForm').reset();
                 document.getElementById('previewBox').style.display = 'none';
                 searchChemical();
             } else {
-                alert(t.saveFail + '：權限不足或資料庫錯誤');
+                const errData = await res.json();
+                alert('儲存失敗：' + (errData.detail || '權限不足'));
             }
         } catch (err) {
             alert(t.connFail + err.message);
@@ -814,6 +832,8 @@
                 localStorage.removeItem('adminToken');
             }
         });
+    } else {
+        applyRoleUI();
     }
 </script>
 

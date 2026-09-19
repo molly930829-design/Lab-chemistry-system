@@ -1,14 +1,18 @@
-from fastapi import FastAPI, Query, Header, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+   from fastapi import FastAPI, Query, Header, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 import os
+import io
+import urllib.request
+import json
 import psycopg2
 
 app = FastAPI()
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
-ADMIN_KEY = os.environ.get("ADMIN_KEY", "labadmin2026") # 預設管理員金鑰
+ADMIN_KEY = os.environ.get("ADMIN_KEY", "labadmin2026")
+GOOGLE_SHEET_WEBHOOK = os.environ.get("GOOGLE_SHEET_WEBHOOK", "")
 
 def get_db_connection():
     if DATABASE_URL:
@@ -21,7 +25,6 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
-    
     if DATABASE_URL:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS chemicals (
@@ -37,8 +40,6 @@ def init_db():
                 note VARCHAR(255)
             );
         """)
-        cursor.execute("ALTER TABLE chemicals ADD COLUMN IF NOT EXISTS formula VARCHAR(255);")
-        cursor.execute("ALTER TABLE chemicals ADD COLUMN IF NOT EXISTS mw VARCHAR(255);")
     else:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS chemicals (
@@ -54,15 +55,6 @@ def init_db():
                 note TEXT
             )
         """)
-        try:
-            cursor.execute("ALTER TABLE chemicals ADD COLUMN formula TEXT;")
-        except Exception:
-            pass
-        try:
-            cursor.execute("ALTER TABLE chemicals ADD COLUMN mw TEXT;")
-        except Exception:
-            pass
-            
     conn.commit()
     cursor.close()
     conn.close()
@@ -84,6 +76,19 @@ class Chemical(BaseModel):
 class UpdateLocationPayload(BaseModel):
     barcode: str
     location: str
+
+def sync_to_google_sheet(payload_dict: dict):
+    if not GOOGLE_SHEET_WEBHOOK:
+        return
+    try:
+        req = urllib.request.Request(
+            GOOGLE_SHEET_WEBHOOK,
+            data=json.dumps(payload_dict).encode('utf-8'),
+            headers={'Content-Type': 'application/json'}
+        )
+        urllib.request.urlopen(req, timeout=10)
+    except Exception as e:
+        print(f"Sync to Google Sheet failed: {e}")
 
 @app.get("/")
 def read_root():
@@ -154,18 +159,17 @@ def search_chemical(q: str = Query("")):
         })
     return results
 
-# 一般使用者即可呼叫：連續掃描批量入櫃
 @app.post("/api/update_location")
-def update_chemical_location(payload: UpdateLocationPayload):
+def update_chemical_location(payload: UpdateLocationPayload, background_tasks: BackgroundTasks):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         if DATABASE_URL:
-            cursor.execute("UPDATE chemicals SET location = %s WHERE barcode = %s RETURNING name;", (payload.location, payload.barcode))
+            cursor.execute("UPDATE chemicals SET location = %s WHERE barcode = %s RETURNING name, cas_no, smiles, formula, mw, safety_class, spec, note;", (payload.location, payload.barcode))
             row = cursor.fetchone()
         else:
             cursor.execute("UPDATE chemicals SET location = ? WHERE barcode = ?", (payload.location, payload.barcode))
-            cursor.execute("SELECT name FROM chemicals WHERE barcode = ?", (payload.barcode,))
+            cursor.execute("SELECT name, cas_no, smiles, formula, mw, safety_class, spec, note FROM chemicals WHERE barcode = ?", (payload.barcode,))
             row = cursor.fetchone()
             
         conn.commit()
@@ -173,6 +177,19 @@ def update_chemical_location(payload: UpdateLocationPayload):
         conn.close()
         
         if row:
+            chem_data = {
+                "barcode": payload.barcode,
+                "name": row[0],
+                "cas_no": row[1] or "",
+                "smiles": row[2] or "",
+                "formula": row[3] or "",
+                "mw": row[4] or "",
+                "safety_class": row[5] or "",
+                "location": payload.location,
+                "spec": row[6] or "",
+                "note": row[7] or ""
+            }
+            background_tasks.add_task(sync_to_google_sheet, chem_data)
             return {"status": "success", "name": row[0]}
         else:
             return {"status": "error", "message": "此條碼未建檔"}
@@ -180,20 +197,17 @@ def update_chemical_location(payload: UpdateLocationPayload):
         conn.close()
         return {"status": "error", "message": str(e)}
 
-# 一般使用者可編輯已入庫藥品；管理員則可新增全新藥品
 @app.post("/api/save_chemical")
-def save_chemical(chem: Chemical, x_admin_key: Optional[str] = Header(None)):
+def save_chemical(chem: Chemical, background_tasks: BackgroundTasks, x_admin_key: Optional[str] = Header(None)):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # 檢查條碼是否存在
     if DATABASE_URL:
         cursor.execute("SELECT barcode FROM chemicals WHERE barcode = %s;", (chem.barcode,))
     else:
         cursor.execute("SELECT barcode FROM chemicals WHERE barcode = ?;", (chem.barcode,))
     exists = cursor.fetchone() is not None
 
-    # 如果是全新入庫，必須驗證管理員權限
     if not exists:
         if x_admin_key != ADMIN_KEY:
             cursor.close()
@@ -225,12 +239,15 @@ def save_chemical(chem: Chemical, x_admin_key: Optional[str] = Header(None)):
         conn.commit()
         cursor.close()
         conn.close()
+        
+        # 背景非同步推送到 Google Sheet，不卡住使用者介面
+        background_tasks.add_task(sync_to_google_sheet, chem.dict())
+        
         return {"status": "success", "mode": "update" if exists else "insert"}
     except Exception as e:
         conn.close()
         return {"status": "error", "message": str(e)}
 
-# 刪除藥品（僅限管理員）
 @app.delete("/api/delete_chemical/{barcode}")
 def delete_chemical(barcode: str, x_admin_key: Optional[str] = Header(None)):
     verify_admin(x_admin_key)
@@ -245,32 +262,28 @@ def delete_chemical(barcode: str, x_admin_key: Optional[str] = Header(None)):
     conn.close()
     return {"status": "success"}
 
-# 匯出資料庫備份（僅限管理員）
-@app.get("/api/backup/json")
-def backup_database_json(x_admin_key: Optional[str] = Header(None)):
-    verify_admin(x_admin_key)
+# 點擊即可直接下載最新 Excel 檔案 (.csv / .xlsx 通用相容)
+@app.get("/api/export/excel")
+def export_excel():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, note FROM chemicals")
+    cursor.execute("SELECT barcode, name, cas_no, formula, mw, safety_class, location, spec, note, smiles FROM chemicals ORDER BY barcode ASC")
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
-    
-    backup_data = []
+
+    output = io.StringIO()
+    # 寫入 UTF-8 BOM 確保 Microsoft Excel 打開時中文絕對不亂碼
+    output.write('\ufeff')
+    output.write("條碼,藥品名稱,CAS No.,分子式,分子量(g/mol),安衛分類,位置座標,規格,備註,SMILES\n")
     for r in rows:
-        backup_data.append({
-            "barcode": r[0],
-            "name": r[1],
-            "cas_no": r[2],
-            "smiles": r[3],
-            "formula": r[4],
-            "mw": r[5],
-            "safety_class": r[6],
-            "location": r[7],
-            "spec": r[8],
-            "note": r[9]
-        })
-    return JSONResponse(
-        content=backup_data,
-        headers={"Content-Disposition": "attachment; filename=lab_chemicals_backup.json"}
+        row_clean = [f'"{str(val or "").replace(chr(34), chr(34)+chr(34))}"' for val in r]
+        output.write(",".join(row_clean) + "\n")
+    
+    mem = io.BytesIO(output.getvalue().encode('utf-8-sig'))
+    output.close()
+    return StreamingResponse(
+        mem,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=chemicals_inventory.csv"}
     )

@@ -21,8 +21,8 @@
 
 <div class="container position-relative">
     <div class="top-controls">
+        <button class="btn btn-outline-success btn-sm" onclick="exportExcel()">📊 匯出 Excel 清冊</button>
         <button class="btn btn-outline-dark btn-sm" onclick="showAuthModal()" id="btnAuth">🔐 登入管理員</button>
-        <button class="btn btn-outline-success btn-sm admin-only" onclick="downloadBackup()" id="btnBackup">💾 匯出備份</button>
         <button class="btn btn-outline-secondary btn-sm" onclick="toggleLanguage()" id="langBtn">English</button>
     </div>
 
@@ -35,7 +35,6 @@
             <span class="badge bg-light text-primary" id="scanModeBadge">一般查詢模式</span>
         </div>
         <div class="card-body text-center">
-            <!-- 批量入櫃提示橫幅 -->
             <div id="cabinetBanner" class="cabinet-banner">
                 <h5 class="text-success fw-bold mb-1">📍 批量入櫃中：<span id="currentCabinetName">未鎖定</span></h5>
                 <small class="text-muted">已鎖定目標藥櫃！接下來掃描的所有藥品將直接歸入此櫃。</small>
@@ -59,7 +58,7 @@
         </div>
     </div>
 
-    <!-- 查詢結果表格（所有使用者皆可點擊編輯，管理員額外擁有刪除按鈕） -->
+    <!-- 查詢結果表格 -->
     <h4 id="resultHeader">查詢結果</h4>
     <div class="table-responsive mb-4">
         <table class="table table-bordered table-hover align-middle">
@@ -164,7 +163,6 @@
                     <input type="text" id="addNote" class="form-control" placeholder="例如：開瓶日期、保管人...">
                 </div>
 
-                <!-- 2D 結構即時預覽畫布 -->
                 <div class="col-12 text-center" id="previewBox" style="display:none;">
                     <label class="form-label fw-bold text-success">✨ 2D 分子結構預覽：</label><br>
                     <canvas id="previewCanvas" width="220" height="150" class="chem-canvas shadow-sm p-2"></canvas>
@@ -323,6 +321,10 @@
         }
     };
 
+    function exportExcel() {
+        window.location.href = '/api/export/excel';
+    }
+
     function showAuthModal() {
         if (isAdmin) {
             if (confirm("是否確定登出管理員身份？")) {
@@ -381,26 +383,6 @@
             titleElem.innerText = dict[currentLang].formTitleUser;
             badgeElem.className = 'badge bg-secondary';
             badgeElem.innerText = '所有人皆可編輯已入庫藥品';
-        }
-    }
-
-    async function downloadBackup() {
-        if (!isAdmin) return;
-        try {
-            const res = await fetch('/api/backup/json', {
-                headers: { 'x-admin-key': adminToken }
-            });
-            if (!res.ok) throw new Error('備份失敗');
-            const blob = await res.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `chemicals_backup_${new Date().toISOString().slice(0,10)}.json`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-        } catch (e) {
-            alert('匯出備份失敗：' + e.message);
         }
     }
 
@@ -642,7 +624,6 @@
                 ? `<div><b>${item.formula}</b></div><small class="text-muted">${item.mw} g/mol</small>` 
                 : '-';
 
-            // 所有人皆能點擊「編輯」，僅管理員會看到「刪除」按鈕
             let deleteBtnHtml = isAdmin 
                 ? `<button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteChemical('${item.barcode}')">${t.btnDelete}</button>` 
                 : '';
@@ -712,7 +693,6 @@
         });
     }
 
-    // 所有人皆可觸發「編輯」已入庫藥品
     function editChemical(index) {
         const item = currentSearchResults[index];
         document.getElementById('addBarcode').value = item.barcode;
@@ -777,7 +757,7 @@
 
             if (res.ok) {
                 const data = await res.json();
-                alert(data.mode === 'insert' ? '🎉 新藥品入庫成功！' : '✅ 藥品資料修改已儲存！');
+                alert(data.mode === 'insert' ? '🎉 新藥品入庫成功！(已同步至 Excel / Google Sheets)' : '✅ 藥品修改已儲存！(已同步至 Excel / Google Sheets)');
                 document.getElementById('searchInput').value = barcodeInput;
                 document.getElementById('addForm').reset();
                 document.getElementById('previewBox').style.display = 'none';

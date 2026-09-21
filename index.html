@@ -9,7 +9,7 @@
     <script src="https://unpkg.com/smiles-drawer@2.0.1/dist/smiles-drawer.min.js"></script>
     <style>
         body { background-color: #f8f9fa; padding: 20px; }
-        .container { max-width: 1200px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .container { max-width: 1280px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         #reader { width: 100%; max-width: 400px; margin: 0 auto; display: none; }
         .top-controls { position: absolute; top: 25px; right: 30px; display: flex; gap: 8px; }
         .chem-canvas { cursor: pointer; background: #fff; border: 1px solid #dee2e6; border-radius: 6px; }
@@ -51,7 +51,7 @@
 
     <!-- 搜尋區 -->
     <div class="mb-4">
-        <label for="searchInput" class="form-label fw-bold" id="searchLabel">🔍 藥品搜尋 (支援名稱模糊搜尋、CAS No.、SMILES 結構式、條碼、擺放位置)</label>
+        <label for="searchInput" class="form-label fw-bold" id="searchLabel">🔍 藥品搜尋 (支援名稱模糊搜尋、CAS No.、廠商、SMILES 結構式、條碼、擺放位置)</label>
         <div class="input-group">
             <input type="text" id="searchInput" class="form-control" placeholder="輸入關鍵字（留空可列出所有藥品）..." onkeypress="handleKeyPress(event)">
             <button class="btn btn-dark" type="button" onclick="searchChemical()" id="btnSearch">搜尋</button>
@@ -72,12 +72,13 @@
                     <th id="thSafety">安衛分類</th>
                     <th id="thLocation">位置座標</th>
                     <th id="thSpec">規格</th>
+                    <th id="thVendor">廠商</th>
                     <th id="thNote">備註</th>
                     <th id="thAction">操作</th>
                 </tr>
             </thead>
             <tbody id="resultBody">
-                <tr><td colspan="10" class="text-center text-muted" id="initialText">請點擊搜尋或輸入關鍵字</td></tr>
+                <tr><td colspan="11" class="text-center text-muted" id="initialText">請點擊搜尋或輸入關鍵字</td></tr>
             </tbody>
         </table>
     </div>
@@ -153,14 +154,30 @@
                     </datalist>
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label" id="lblSpec">規格 / 純度</label>
                     <input type="text" id="addSpec" class="form-control" placeholder="例如：500mL / 99%">
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-md-2">
+                    <label class="form-label fw-bold" id="lblVendor">廠商 (Vendor)</label>
+                    <input type="text" id="addVendor" list="vendorOptions" class="form-control" placeholder="選取或填寫廠商">
+                    <datalist id="vendorOptions">
+                        <option value="Sigma-Aldrich"></option>
+                        <option value="Merck"></option>
+                        <option value="Alfa Aesar"></option>
+                        <option value="TCI (東京化成)"></option>
+                        <option value="Acros Organics"></option>
+                        <option value="Thermo Fisher"></option>
+                        <option value="BLD Pharm"></option>
+                        <option value="J.T. Baker"></option>
+                        <option value="台塑 / 景明"></option>
+                    </datalist>
+                </div>
+
+                <div class="col-md-2">
                     <label class="form-label" id="lblNote">備註</label>
-                    <input type="text" id="addNote" class="form-control" placeholder="例如：開瓶日期、保管人...">
+                    <input type="text" id="addNote" class="form-control" placeholder="開瓶日、保管人...">
                 </div>
 
                 <div class="col-12 text-center" id="previewBox" style="display:none;">
@@ -233,7 +250,7 @@
             scanHeader: "相機條碼掃描（支援連續批量入櫃）",
             btnScanOpen: "開啟相機掃描",
             btnScanClose: "關閉相機",
-            searchLabel: "🔍 藥品搜尋 (支援名稱模糊搜尋、CAS No.、SMILES 結構式、條碼、擺放位置)",
+            searchLabel: "🔍 藥品搜尋 (支援名稱模糊搜尋、CAS No.、廠商、SMILES 結構式、條碼、擺放位置)",
             searchPlaceholder: "輸入關鍵字（留空可列出所有藥品）...",
             btnSearch: "搜尋",
             resultHeader: "查詢結果",
@@ -245,6 +262,7 @@
             thSafety: "安衛分類",
             thLocation: "位置座標",
             thSpec: "規格",
+            thVendor: "廠商",
             thNote: "備註",
             thAction: "操作",
             initialText: "請點擊搜尋或輸入關鍵字",
@@ -264,6 +282,8 @@
             safetyPh: "可選取或直接輸入新分類",
             locationPh: "可選取或直接輸入新位置",
             lblSpec: "規格 / 純度",
+            lblVendor: "廠商 (Vendor)",
+            vendorPh: "選取或填寫廠商",
             lblNote: "備註",
             btnSubmit: "💾 儲存修改 / 入庫建檔",
             btnEdit: "編輯",
@@ -279,7 +299,7 @@
             scanHeader: "Barcode Scanner (Batch Storage Supported)",
             btnScanOpen: "Start Camera Scan",
             btnScanClose: "Close Camera",
-            searchLabel: "🔍 Chemical Search (Fuzzy Name, CAS No., SMILES, Barcode, Location)",
+            searchLabel: "🔍 Chemical Search (Fuzzy Name, CAS No., Vendor, SMILES, Barcode, Location)",
             searchPlaceholder: "Type keywords (leave empty to list all)...",
             btnSearch: "Search",
             resultHeader: "Search Results",
@@ -291,6 +311,7 @@
             thSafety: "Safety Class",
             thLocation: "Location",
             thSpec: "Spec",
+            thVendor: "Vendor",
             thNote: "Note",
             thAction: "Action",
             initialText: "Click search or enter keywords",
@@ -310,6 +331,8 @@
             safetyPh: "Select or type new safety class",
             locationPh: "Select or type new location",
             lblSpec: "Spec / Purity",
+            lblVendor: "Vendor / Supplier",
+            vendorPh: "Select or type vendor",
             lblNote: "Note",
             btnSubmit: "💾 Save Changes / Stock In",
             btnEdit: "Edit",
@@ -405,6 +428,7 @@
         document.getElementById('thSafety').innerText = t.thSafety;
         document.getElementById('thLocation').innerText = t.thLocation;
         document.getElementById('thSpec').innerText = t.thSpec;
+        document.getElementById('thVendor').innerText = t.thVendor;
         document.getElementById('thNote').innerText = t.thNote;
         document.getElementById('thAction').innerText = t.thAction;
         document.getElementById('lblBarcode').innerText = t.lblBarcode;
@@ -419,6 +443,8 @@
         document.getElementById('addSafety').placeholder = t.safetyPh;
         document.getElementById('addLocation').placeholder = t.locationPh;
         document.getElementById('lblSpec').innerText = t.lblSpec;
+        document.getElementById('lblVendor').innerText = t.lblVendor;
+        document.getElementById('addVendor').placeholder = t.vendorPh;
         document.getElementById('lblNote').innerText = t.lblNote;
         document.getElementById('btnSubmit').innerText = t.btnSubmit;
 
@@ -587,7 +613,7 @@
         const t = dict[currentLang];
         const query = document.getElementById('searchInput').value.trim();
         const tbody = document.getElementById('resultBody');
-        tbody.innerHTML = `<tr><td colspan="10" class="text-center text-primary">${t.searching}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center text-primary">${t.searching}</td></tr>`;
 
         try {
             const params = new URLSearchParams({ q: query });
@@ -598,7 +624,7 @@
             currentSearchResults = await res.json();
             renderResults();
         } catch (err) {
-            tbody.innerHTML = `<tr><td colspan="10" class="text-center text-danger">${t.connFail} ${err.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger">${t.connFail} ${err.message}</td></tr>`;
         }
     }
 
@@ -608,7 +634,7 @@
         tbody.innerHTML = '';
 
         if (!currentSearchResults || currentSearchResults.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="10" class="text-center text-danger" id="initialText">${t.notFound}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger" id="initialText">${t.notFound}</td></tr>`;
             return;
         }
 
@@ -644,6 +670,7 @@
                 <td><span class="badge bg-warning text-dark">${item.safety_class}</span></td>
                 <td><span class="badge bg-info text-dark">${item.location}</span></td>
                 <td>${item.spec}</td>
+                <td><span class="badge bg-light text-dark border">${item.vendor}</span></td>
                 <td>${item.note}</td>
                 ${actionHtml}
             `;
@@ -704,6 +731,7 @@
         document.getElementById('addSafety').value = item.safety_class === '-' ? '' : item.safety_class;
         document.getElementById('addLocation').value = item.location === '-' ? '' : item.location;
         document.getElementById('addSpec').value = item.spec === '-' ? '' : item.spec;
+        document.getElementById('addVendor').value = item.vendor === '-' ? '' : item.vendor;
         document.getElementById('addNote').value = item.note === '-' ? '' : item.note;
         
         previewStructure();
@@ -742,6 +770,7 @@
             safety_class: document.getElementById('addSafety').value.trim(),
             location: document.getElementById('addLocation').value.trim(),
             spec: document.getElementById('addSpec').value.trim(),
+            vendor: document.getElementById('addVendor').value.trim(),
             note: document.getElementById('addNote').value.trim()
         };
 

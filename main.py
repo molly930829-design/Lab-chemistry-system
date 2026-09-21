@@ -37,8 +37,18 @@ def init_db():
                 safety_class VARCHAR(255),
                 location VARCHAR(255),
                 spec VARCHAR(255),
+                vendor VARCHAR(255),
                 note VARCHAR(255)
             );
+        """)
+        # 自動為已存在的舊資料表補上 vendor 欄位
+        cursor.execute("""
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chemicals' AND column_name='vendor') THEN 
+                    ALTER TABLE chemicals ADD COLUMN vendor VARCHAR(255); 
+                END IF; 
+            END $$;
         """)
     else:
         cursor.execute("""
@@ -52,9 +62,15 @@ def init_db():
                 safety_class TEXT,
                 location TEXT,
                 spec TEXT,
+                vendor TEXT,
                 note TEXT
             )
         """)
+        try:
+            cursor.execute("ALTER TABLE chemicals ADD COLUMN vendor TEXT;")
+        except:
+            pass
+
     conn.commit()
     cursor.close()
     conn.close()
@@ -71,6 +87,7 @@ class Chemical(BaseModel):
     safety_class: Optional[str] = ""
     location: Optional[str] = ""
     spec: Optional[str] = ""
+    vendor: Optional[str] = ""
     note: Optional[str] = ""
 
 class UpdateLocationPayload(BaseModel):
@@ -112,10 +129,10 @@ def search_chemical(q: str = Query("")):
     
     if DATABASE_URL:
         if not q.strip():
-            cursor.execute("SELECT barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, note FROM chemicals LIMIT 100")
+            cursor.execute("SELECT barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, vendor, note FROM chemicals LIMIT 100")
         else:
             cursor.execute("""
-                SELECT barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, note 
+                SELECT barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, vendor, note 
                 FROM chemicals 
                 WHERE barcode ILIKE %s 
                    OR name ILIKE %s 
@@ -123,13 +140,14 @@ def search_chemical(q: str = Query("")):
                    OR smiles ILIKE %s 
                    OR location ILIKE %s 
                    OR safety_class ILIKE %s
-            """, (keyword, keyword, keyword, keyword, keyword, keyword))
+                   OR vendor ILIKE %s
+            """, (keyword, keyword, keyword, keyword, keyword, keyword, keyword))
     else:
         if not q.strip():
-            cursor.execute("SELECT barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, note FROM chemicals LIMIT 100")
+            cursor.execute("SELECT barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, vendor, note FROM chemicals LIMIT 100")
         else:
             cursor.execute("""
-                SELECT barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, note 
+                SELECT barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, vendor, note 
                 FROM chemicals 
                 WHERE barcode LIKE ? 
                    OR name LIKE ? 
@@ -137,7 +155,8 @@ def search_chemical(q: str = Query("")):
                    OR smiles LIKE ? 
                    OR location LIKE ? 
                    OR safety_class LIKE ?
-            """, (keyword, keyword, keyword, keyword, keyword, keyword))
+                   OR vendor LIKE ?
+            """, (keyword, keyword, keyword, keyword, keyword, keyword, keyword))
             
     rows = cursor.fetchall()
     cursor.close()
@@ -155,7 +174,8 @@ def search_chemical(q: str = Query("")):
             "safety_class": row[6] if row[6] else "-",
             "location": row[7] if row[7] else "-",
             "spec": row[8] if row[8] else "-",
-            "note": row[9] if row[9] else "-"
+            "vendor": row[9] if row[9] else "-",
+            "note": row[10] if row[10] else "-"
         })
     return results
 
@@ -165,11 +185,11 @@ def update_chemical_location(payload: UpdateLocationPayload, background_tasks: B
     cursor = conn.cursor()
     try:
         if DATABASE_URL:
-            cursor.execute("UPDATE chemicals SET location = %s WHERE barcode = %s RETURNING name, cas_no, smiles, formula, mw, safety_class, spec, note;", (payload.location, payload.barcode))
+            cursor.execute("UPDATE chemicals SET location = %s WHERE barcode = %s RETURNING name, cas_no, smiles, formula, mw, safety_class, spec, vendor, note;", (payload.location, payload.barcode))
             row = cursor.fetchone()
         else:
             cursor.execute("UPDATE chemicals SET location = ? WHERE barcode = ?", (payload.location, payload.barcode))
-            cursor.execute("SELECT name, cas_no, smiles, formula, mw, safety_class, spec, note FROM chemicals WHERE barcode = ?", (payload.barcode,))
+            cursor.execute("SELECT name, cas_no, smiles, formula, mw, safety_class, spec, vendor, note FROM chemicals WHERE barcode = ?", (payload.barcode,))
             row = cursor.fetchone()
             
         conn.commit()
@@ -187,7 +207,8 @@ def update_chemical_location(payload: UpdateLocationPayload, background_tasks: B
                 "safety_class": row[5] or "",
                 "location": payload.location,
                 "spec": row[6] or "",
-                "note": row[7] or ""
+                "vendor": row[7] or "",
+                "note": row[8] or ""
             }
             background_tasks.add_task(sync_to_google_sheet, chem_data)
             return {"status": "success", "name": row[0]}
@@ -217,8 +238,8 @@ def save_chemical(chem: Chemical, background_tasks: BackgroundTasks, x_admin_key
     try:
         if DATABASE_URL:
             cursor.execute("""
-                INSERT INTO chemicals (barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, note)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO chemicals (barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, vendor, note)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (barcode) DO UPDATE SET
                     name = EXCLUDED.name,
                     cas_no = EXCLUDED.cas_no,
@@ -228,19 +249,19 @@ def save_chemical(chem: Chemical, background_tasks: BackgroundTasks, x_admin_key
                     safety_class = EXCLUDED.safety_class,
                     location = EXCLUDED.location,
                     spec = EXCLUDED.spec,
+                    vendor = EXCLUDED.vendor,
                     note = EXCLUDED.note;
-            """, (chem.barcode, chem.name, chem.cas_no, chem.smiles, chem.formula, chem.mw, chem.safety_class, chem.location, chem.spec, chem.note))
+            """, (chem.barcode, chem.name, chem.cas_no, chem.smiles, chem.formula, chem.mw, chem.safety_class, chem.location, chem.spec, chem.vendor, chem.note))
         else:
             cursor.execute("""
-                INSERT OR REPLACE INTO chemicals (barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, note)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (chem.barcode, chem.name, chem.cas_no, chem.smiles, chem.formula, chem.mw, chem.safety_class, chem.location, chem.spec, chem.note))
+                INSERT OR REPLACE INTO chemicals (barcode, name, cas_no, smiles, formula, mw, safety_class, location, spec, vendor, note)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (chem.barcode, chem.name, chem.cas_no, chem.smiles, chem.formula, chem.mw, chem.safety_class, chem.location, chem.spec, chem.vendor, chem.note))
             
         conn.commit()
         cursor.close()
         conn.close()
         
-        # 背景非同步推送到 Google Sheet，不卡住使用者介面
         background_tasks.add_task(sync_to_google_sheet, chem.dict())
         
         return {"status": "success", "mode": "update" if exists else "insert"}
@@ -262,20 +283,18 @@ def delete_chemical(barcode: str, x_admin_key: Optional[str] = Header(None)):
     conn.close()
     return {"status": "success"}
 
-# 點擊即可直接下載最新 Excel 檔案 (.csv / .xlsx 通用相容)
 @app.get("/api/export/excel")
 def export_excel():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT barcode, name, cas_no, formula, mw, safety_class, location, spec, note, smiles FROM chemicals ORDER BY barcode ASC")
+    cursor.execute("SELECT barcode, name, cas_no, formula, mw, safety_class, location, spec, vendor, note, smiles FROM chemicals ORDER BY barcode ASC")
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
 
     output = io.StringIO()
-    # 寫入 UTF-8 BOM 確保 Microsoft Excel 打開時中文絕對不亂碼
     output.write('\ufeff')
-    output.write("條碼,藥品名稱,CAS No.,分子式,分子量(g/mol),安衛分類,位置座標,規格,備註,SMILES\n")
+    output.write("條碼,藥品名稱,CAS No.,分子式,分子量(g/mol),安衛分類,位置座標,規格,廠商,備註,SMILES\n")
     for r in rows:
         row_clean = [f'"{str(val or "").replace(chr(34), chr(34)+chr(34))}"' for val in r]
         output.write(",".join(row_clean) + "\n")

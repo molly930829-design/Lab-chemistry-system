@@ -9,7 +9,7 @@
     <script src="https://unpkg.com/smiles-drawer@2.0.1/dist/smiles-drawer.min.js"></script>
     <style>
         body { background-color: #f8f9fa; padding: 20px; }
-        .container { max-width: 1280px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .container { max-width: 1320px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         #reader { width: 100%; max-width: 400px; margin: 0 auto; display: none; }
         .top-controls { position: absolute; top: 25px; right: 30px; display: flex; gap: 8px; }
         .chem-canvas { cursor: pointer; background: #fff; border: 1px solid #dee2e6; border-radius: 6px; }
@@ -51,9 +51,9 @@
 
     <!-- 搜尋區 -->
     <div class="mb-4">
-        <label for="searchInput" class="form-label fw-bold" id="searchLabel">🔍 藥品搜尋 (支援名稱模糊搜尋、CAS No.、廠商、SMILES 結構式、條碼、擺放位置)</label>
+        <label for="searchInput" class="form-label fw-bold" id="searchLabel">🔍 藥品搜尋 (支援中英文名稱模糊搜尋、CAS No.、廠商、SMILES 結構式、條碼、擺放位置)</label>
         <div class="input-group">
-            <input type="text" id="searchInput" class="form-control" placeholder="輸入關鍵字（留空可列出所有藥品）..." onkeypress="handleKeyPress(event)">
+            <input type="text" id="searchInput" class="form-control" placeholder="輸入中文或英文關鍵字（留空可列出所有藥品）..." onkeypress="handleKeyPress(event)">
             <button class="btn btn-dark" type="button" onclick="searchChemical()" id="btnSearch">搜尋</button>
         </div>
     </div>
@@ -65,7 +65,7 @@
             <thead class="table-light">
                 <tr>
                     <th id="thBarcode">條碼</th>
-                    <th id="thName">藥品名稱</th>
+                    <th id="thName">藥品名稱 (中/英)</th>
                     <th id="thCas">CAS No.</th>
                     <th id="thFormula">分子式/分子量</th>
                     <th id="thStructure">2D 化學結構</th>
@@ -92,13 +92,13 @@
         </div>
         <form id="addForm" onsubmit="saveChemical(event)">
             <div class="row g-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label fw-bold" id="lblBarcode">瓶身條碼 *</label>
                     <input type="text" id="addBarcode" class="form-control" placeholder="例如：CHEM-00001" required>
                     <small class="text-muted" id="barcodeTip">（若為新條碼入庫，需管理員權限）</small>
                 </div>
                 
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label fw-bold" id="lblCas">CAS Number</label>
                     <div class="input-group">
                         <input type="text" id="addCas" class="form-control" placeholder="例如：64-17-5">
@@ -106,9 +106,14 @@
                     </div>
                 </div>
 
-                <div class="col-md-4">
-                    <label class="form-label fw-bold" id="lblName">藥品名稱 *</label>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold" id="lblName">英文名稱 *</label>
                     <input type="text" id="addName" class="form-control" placeholder="例如：Ethanol" required>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold" id="lblChineseName">中文名稱</label>
+                    <input type="text" id="addChineseName" class="form-control" placeholder="例如：乙醇">
                 </div>
 
                 <div class="col-md-4">
@@ -250,12 +255,12 @@
             scanHeader: "相機條碼掃描（支援連續批量入櫃）",
             btnScanOpen: "開啟相機掃描",
             btnScanClose: "關閉相機",
-            searchLabel: "🔍 藥品搜尋 (支援名稱模糊搜尋、CAS No.、廠商、SMILES 結構式、條碼、擺放位置)",
-            searchPlaceholder: "輸入關鍵字（留空可列出所有藥品）...",
+            searchLabel: "🔍 藥品搜尋 (支援中英文名稱模糊搜尋、CAS No.、廠商、SMILES 結構式、條碼、擺放位置)",
+            searchPlaceholder: "輸入中文或英文關鍵字（留空可列出所有藥品）...",
             btnSearch: "搜尋",
             resultHeader: "查詢結果",
             thBarcode: "條碼",
-            thName: "藥品名稱",
+            thName: "藥品名稱 (中/英)",
             thCas: "CAS No.",
             thFormula: "分子式/分子量",
             thStructure: "2D 化學結構",
@@ -271,7 +276,8 @@
             formTitleUser: "📝 編輯已入庫藥品資料",
             formTitleAdmin: "➕ 新增入庫 / 編輯藥品 (管理員模式)",
             lblBarcode: "瓶身條碼 *",
-            lblName: "藥品名稱 *",
+            lblName: "英文名稱 *",
+            lblChineseName: "中文名稱",
             lblCas: "CAS Number",
             btnFetchCas: "🔍 自動帶入",
             lblSmiles: "SMILES 結構式",
@@ -299,12 +305,12 @@
             scanHeader: "Barcode Scanner (Batch Storage Supported)",
             btnScanOpen: "Start Camera Scan",
             btnScanClose: "Close Camera",
-            searchLabel: "🔍 Chemical Search (Fuzzy Name, CAS No., Vendor, SMILES, Barcode, Location)",
+            searchLabel: "🔍 Chemical Search (English/Chinese Name, CAS No., Vendor, SMILES, Barcode, Location)",
             searchPlaceholder: "Type keywords (leave empty to list all)...",
             btnSearch: "Search",
             resultHeader: "Search Results",
             thBarcode: "Barcode",
-            thName: "Chemical Name",
+            thName: "Chemical Name (EN/ZH)",
             thCas: "CAS No.",
             thFormula: "Formula / MW",
             thStructure: "2D Structure",
@@ -320,7 +326,8 @@
             formTitleUser: "📝 Edit Existing Chemical",
             formTitleAdmin: "➕ Add New / Edit Chemical (Admin Mode)",
             lblBarcode: "Bottle Barcode *",
-            lblName: "Chemical Name *",
+            lblName: "English Name *",
+            lblChineseName: "Chinese Name",
             lblCas: "CAS Number",
             btnFetchCas: "🔍 Auto-fetch",
             lblSmiles: "SMILES Structure",
@@ -433,6 +440,7 @@
         document.getElementById('thAction').innerText = t.thAction;
         document.getElementById('lblBarcode').innerText = t.lblBarcode;
         document.getElementById('lblName').innerText = t.lblName;
+        document.getElementById('lblChineseName').innerText = t.lblChineseName;
         document.getElementById('lblCas').innerText = t.lblCas;
         document.getElementById('btnFetchCas').innerText = t.btnFetchCas;
         document.getElementById('lblSmiles').innerText = t.lblSmiles;
@@ -650,6 +658,10 @@
                 ? `<div><b>${item.formula}</b></div><small class="text-muted">${item.mw} g/mol</small>` 
                 : '-';
 
+            const nameDisplay = item.chinese_name && item.chinese_name !== '-'
+                ? `<div><b>${item.name}</b></div><div class="text-primary small">${item.chinese_name}</div>`
+                : `<b>${item.name}</b>`;
+
             let deleteBtnHtml = isAdmin 
                 ? `<button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteChemical('${item.barcode}')">${t.btnDelete}</button>` 
                 : '';
@@ -663,7 +675,7 @@
 
             tr.innerHTML = `
                 <td><code>${item.barcode}</code></td>
-                <td><b>${item.name}</b></td>
+                <td>${nameDisplay}</td>
                 <td>${item.cas_no}</td>
                 <td>${formulaMw}</td>
                 <td class="text-center">${structHtml}</td>
@@ -679,7 +691,7 @@
             if (item.smiles && item.smiles !== '-') {
                 const cvs = document.getElementById(`canvas-${index}`);
                 if (cvs) {
-                    cvs.onclick = () => showBigStruct(item.name, item.smiles, item.formula, item.mw);
+                    cvs.onclick = () => showBigStruct(item.name, item.smiles, item.formula, item.mw, item.chinese_name);
                 }
             }
         });
@@ -693,8 +705,9 @@
         });
     }
 
-    function showBigStruct(name, smiles, formula, mw) {
-        document.getElementById('modalTitle').innerText = name + ' - 2D 化學結構';
+    function showBigStruct(name, smiles, formula, mw, chineseName) {
+        const titleText = (chineseName && chineseName !== '-') ? `${name} (${chineseName}) - 2D 化學結構` : `${name} - 2D 化學結構`;
+        document.getElementById('modalTitle').innerText = titleText;
         document.getElementById('modalDetails').innerHTML = `
             <div><b>SMILES:</b> <code>${smiles}</code></div>
             <div><b>分子式:</b> ${formula} | <b>分子量:</b> ${mw} g/mol</div>
@@ -724,6 +737,7 @@
         const item = currentSearchResults[index];
         document.getElementById('addBarcode').value = item.barcode;
         document.getElementById('addName').value = item.name;
+        document.getElementById('addChineseName').value = item.chinese_name === '-' ? '' : item.chinese_name;
         document.getElementById('addCas').value = item.cas_no === '-' ? '' : item.cas_no;
         document.getElementById('addSmiles').value = item.smiles === '-' ? '' : item.smiles;
         document.getElementById('addFormula').value = item.formula === '-' ? '' : item.formula;
@@ -763,6 +777,7 @@
         const payload = {
             barcode: barcodeInput,
             name: document.getElementById('addName').value.trim(),
+            chinese_name: document.getElementById('addChineseName').value.trim(),
             cas_no: document.getElementById('addCas').value.trim(),
             smiles: document.getElementById('addSmiles').value.trim(),
             formula: document.getElementById('addFormula').value.trim(),

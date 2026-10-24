@@ -28,11 +28,17 @@
 
     <h2 class="text-center mb-4" id="title">🧪 實驗室藥品精密管理系統</h2>
 
-    <!-- 相機掃描區 -->
+    <!-- 相機掃描區（整合查藥與入櫃雙模式） -->
     <div class="card mb-4">
-        <div class="card-header bg-primary text-white fw-bold d-flex justify-content-between align-items-center">
-            <span id="scanHeader">相機條碼掃描（支援連續批量入櫃）</span>
-            <span class="badge bg-light text-primary" id="scanModeBadge">一般查詢模式</span>
+        <div class="card-header bg-primary text-white fw-bold d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span id="scanHeader">相機條碼掃描</span>
+            <div class="btn-group btn-group-sm" role="group">
+                <input type="radio" class="btn-check" name="scanModeRadio" id="modeView" autocomplete="off" checked onclick="switchScanMode('view')">
+                <label class="btn btn-outline-light fw-bold" for="modeView" id="lblModeView">🔍 掃櫃查藥</label>
+
+                <input type="radio" class="btn-check" name="scanModeRadio" id="modeBatch" autocomplete="off" onclick="switchScanMode('batch')">
+                <label class="btn btn-outline-light fw-bold" for="modeBatch" id="lblModeBatch">📥 批量入櫃</label>
+            </div>
         </div>
         <div class="card-body text-center">
             <div id="cabinetBanner" class="cabinet-banner">
@@ -128,7 +134,7 @@
                     <input type="text" id="addMw" class="form-control" placeholder="例如：46.07">
                 </div>
 
-                <!-- 第三排：分類、位置、規格、廠商與備註 (3+3+2+2+2 = 12 格，絕不折行) -->
+                <!-- 第三排：分類、位置、規格、廠商與備註 (3+3+2+2+2 = 12 格) -->
                 <div class="col-md-3">
                     <label class="form-label fw-bold" id="lblSafety">安衛分類 *</label>
                     <input type="text" id="addSafety" list="safetyOptions" class="form-control" placeholder="可選取或輸入分類" required>
@@ -233,11 +239,12 @@
     let isProcessingScan = false;
     let isAdmin = false;
     let adminToken = localStorage.getItem('adminToken') || '';
+    let currentOperationMode = 'view'; // 'view': 掃櫃查藥模式, 'batch': 批量入櫃模式
 
     let smilesDrawer = new SmilesDrawer.Drawer({ width: 100, height: 70 });
     let bigDrawer = new SmilesDrawer.Drawer({ width: 350, height: 250 });
 
-    // 櫃位代碼與顯示名稱映射表（含 5 個常溫藥品櫃、毒化物櫃、酸鹼櫃、冰箱與防爆櫃）
+    // 櫃位代碼與顯示名稱映射表（含 5 個常溫櫃、毒化物櫃、酸鹼櫃、冰箱與防爆櫃）
     const cabinetMap = {
         // 防爆櫃
         "LOC-A1": "防爆櫃 A-1",
@@ -275,7 +282,9 @@
         zh: {
             langBtn: "English",
             title: "🧪 實驗室藥品精密管理系統",
-            scanHeader: "相機條碼掃描（支援連續批量入櫃）",
+            scanHeader: "相機條碼掃描",
+            lblModeView: "🔍 掃櫃查藥",
+            lblModeBatch: "📥 批量入櫃",
             btnScanOpen: "開啟相機掃描",
             btnScanClose: "關閉相機",
             searchLabel: "🔍 藥品搜尋 (支援中英文名稱模糊搜尋、CAS No.、廠商、SMILES 結構式、條碼、擺放位置)",
@@ -325,7 +334,9 @@
         en: {
             langBtn: "中文",
             title: "🧪 Precision Lab Chemical Management System",
-            scanHeader: "Barcode Scanner (Batch Storage Supported)",
+            scanHeader: "Barcode Scanner",
+            lblModeView: "🔍 View Cabinet",
+            lblModeBatch: "📥 Batch Stock-in",
             btnScanOpen: "Start Camera Scan",
             btnScanClose: "Close Camera",
             searchLabel: "🔍 Chemical Search (English/Chinese Name, CAS No., Vendor, SMILES, Barcode, Location)",
@@ -445,6 +456,9 @@
 
         document.getElementById('langBtn').innerText = t.langBtn;
         document.getElementById('title').innerText = t.title;
+        document.getElementById('scanHeader').innerText = t.scanHeader;
+        document.getElementById('lblModeView').innerText = t.lblModeView;
+        document.getElementById('lblModeBatch').innerText = t.lblModeBatch;
         document.getElementById('btnScan').innerText = isScanning ? t.btnScanClose : t.btnScanOpen;
         document.getElementById('searchLabel').innerText = t.searchLabel;
         document.getElementById('searchInput').placeholder = t.searchPlaceholder;
@@ -486,11 +500,16 @@
         renderResults();
     }
 
+    function switchScanMode(mode) {
+        currentOperationMode = mode;
+        if (mode === 'view') {
+            exitCabinetMode();
+        }
+    }
+
     function exitCabinetMode() {
         currentCabinet = null;
         document.getElementById('cabinetBanner').style.display = 'none';
-        document.getElementById('scanModeBadge').className = 'badge bg-light text-primary';
-        document.getElementById('scanModeBadge').innerText = '一般查詢模式';
         document.getElementById('scanFeedback').innerText = '';
     }
 
@@ -500,12 +519,28 @@
         const feedback = document.getElementById('scanFeedback');
         feedback.style.display = 'block';
 
-        if (cabinetMap[text] || text.startsWith("LOC-") || text.startsWith("CAB-")) {
+        // 判斷是否為藥櫃條碼
+        const isCabinetBarcode = cabinetMap[text] || text.startsWith("LOC-") || text.startsWith("CAB-");
+
+        // 情況 1：在「🔍 掃櫃查藥模式」下掃描了藥品櫃條碼
+        if (isCabinetBarcode && currentOperationMode === 'view') {
+            const cabinetName = cabinetMap[text] || text;
+            feedback.className = 'mt-2 fw-bold text-primary';
+            feedback.innerText = `🔍 正在查詢【${cabinetName}】內存放的所有藥品...`;
+            
+            document.getElementById('searchInput').value = cabinetName;
+            searchChemical();
+            
+            toggleScanner(); // 查到後關閉相機直接檢視表格
+            isProcessingScan = false;
+            return;
+        }
+
+        // 情況 2：在「📥 批量入櫃模式」下掃描了藥品櫃條碼（鎖定藥櫃）
+        if (isCabinetBarcode && currentOperationMode === 'batch') {
             currentCabinet = cabinetMap[text] || text;
             document.getElementById('currentCabinetName').innerText = currentCabinet;
             document.getElementById('cabinetBanner').style.display = 'block';
-            document.getElementById('scanModeBadge').className = 'badge bg-success text-white';
-            document.getElementById('scanModeBadge').innerText = `入櫃模式 (${currentCabinet})`;
             feedback.className = 'mt-2 fw-bold text-success';
             feedback.innerText = `✅ 已鎖定藥櫃：${currentCabinet}！請開始連續掃描藥品條碼。`;
             
@@ -513,6 +548,7 @@
             return;
         }
 
+        // 情況 3：已鎖定藥櫃狀態下，掃描了藥品條碼（批量入櫃）
         if (currentCabinet) {
             feedback.className = 'mt-2 fw-bold text-primary';
             feedback.innerText = `🔄 正在將藥品 ${text} 歸入 ${currentCabinet}...`;
@@ -541,6 +577,7 @@
             return;
         }
 
+        // 情況 4：未鎖定藥櫃時掃描了普通藥品條碼（單瓶藥品查詢）
         document.getElementById('searchInput').value = text;
         searchChemical();
         toggleScanner();

@@ -15,6 +15,28 @@
         .chem-canvas { cursor: pointer; background: #fff; border: 1px solid #dee2e6; border-radius: 6px; }
         .cabinet-banner { display: none; background: #e8f5e9; border: 2px dashed #2e7d32; border-radius: 8px; padding: 12px; margin-bottom: 15px; }
         .admin-only { display: none; }
+        
+        /* Filter Chips 樣式 */
+        .filter-chip-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .filter-chip {
+            border-radius: 20px;
+            font-size: 0.85rem;
+            padding: 4px 14px;
+            border: 1px solid #ced4da;
+            background: #fff;
+            color: #495057;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        .filter-chip:hover { background-color: #e9ecef; }
+        .filter-chip.active {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+            color: #fff;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(13, 110, 253, 0.25);
+        }
     </style>
 </head>
 <body>
@@ -55,17 +77,31 @@
         </div>
     </div>
 
-    <!-- 搜尋區 -->
+    <!-- 搜尋區與即時過濾標籤 -->
     <div class="mb-4">
         <label for="searchInput" class="form-label fw-bold" id="searchLabel">🔍 藥品搜尋 (支援中英文名稱模糊搜尋、CAS No.、廠商、SMILES 結構式、條碼、擺放位置)</label>
         <div class="input-group">
             <input type="text" id="searchInput" class="form-control" placeholder="輸入中文或英文關鍵字（留空可列出所有藥品）..." onkeypress="handleKeyPress(event)">
             <button class="btn btn-dark" type="button" onclick="searchChemical()" id="btnSearch">搜尋</button>
         </div>
+        
+        <!-- Filter Chips 區塊 -->
+        <div class="filter-chip-group" id="filterChipsContainer">
+            <span class="text-muted small align-self-center me-1" id="lblQuickFilter">⚡ 快速篩選：</span>
+            <button type="button" class="filter-chip active" data-filter="all" onclick="setFilter('all', this)">全部</button>
+            <button type="button" class="filter-chip" data-filter="fridge" onclick="setFilter('fridge', this)">❄️ 冷藏 4°C</button>
+            <button type="button" class="filter-chip" data-filter="freezer" onclick="setFilter('freezer', this)">🧊 冷凍 -20°C</button>
+            <button type="button" class="filter-chip" data-filter="cabinet" onclick="setFilter('cabinet', this)">🚪 常溫櫃 (B1-B5)</button>
+            <button type="button" class="filter-chip" data-filter="toxic" onclick="setFilter('toxic', this)">☠️ 毒化/管制</button>
+            <button type="button" class="filter-chip" data-filter="hazard" onclick="setFilter('hazard', this)">⚠️ 特殊危險 (酸鹼/氧化/禁水)</button>
+        </div>
     </div>
 
     <!-- 查詢結果表格 -->
-    <h4 id="resultHeader">查詢結果</h4>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h4 id="resultHeader" class="mb-0">查詢結果</h4>
+        <span id="resultCountBadge" class="badge bg-secondary">0 筆資料</span>
+    </div>
     <div class="table-responsive mb-4">
         <table class="table table-bordered table-hover align-middle">
             <thead class="table-light">
@@ -232,7 +268,9 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     let currentLang = 'zh';
-    let currentSearchResults = [];
+    let rawSearchResults = [];     // 保存後端傳回的原始資料
+    let currentSearchResults = []; // 當前過濾後顯示的資料
+    let currentFilter = 'all';     // 當前過濾標籤
     let html5QrCode;
     let isScanning = false;
     let currentCabinet = null;
@@ -244,28 +282,18 @@
     let smilesDrawer = new SmilesDrawer.Drawer({ width: 100, height: 70 });
     let bigDrawer = new SmilesDrawer.Drawer({ width: 350, height: 250 });
 
-    // 櫃位代碼與顯示名稱映射表（含 5 個常溫櫃、毒化物櫃、酸鹼櫃、冰箱與防爆櫃）
     const cabinetMap = {
-        // 防爆櫃
         "LOC-A1": "防爆櫃 A-1",
         "LOC-A2": "防爆櫃 A-2",
-        
-        // 5 個常溫主藥品櫃
         "LOC-B1": "藥品櫃 B-1",
         "LOC-B2": "藥品櫃 B-2",
         "LOC-B3": "藥品櫃 B-3",
         "LOC-B4": "藥品櫃 B-4",
         "LOC-B5": "藥品櫃 B-5",
-        
-        // 毒化物專用櫃
         "LOC-T1": "毒化物櫃 T-1",
-        
-        // 耐酸鹼排氣櫃與冰箱
         "LOC-C1": "酸鹼櫃 C-1",
         "LOC-R1": "冷藏冰箱 R-1",
         "LOC-F1": "冷凍冰箱 F-1",
-        
-        // 冰箱細分層架
         "LOC-RA1": "冰箱 A (C0-C2)",
         "LOC-RA2": "冰箱 A (C3)",
         "LOC-RA3": "冰箱 A (C4)",
@@ -290,6 +318,13 @@
             searchLabel: "🔍 藥品搜尋 (支援中英文名稱模糊搜尋、CAS No.、廠商、SMILES 結構式、條碼、擺放位置)",
             searchPlaceholder: "輸入中文或英文關鍵字（留空可列出所有藥品）...",
             btnSearch: "搜尋",
+            lblQuickFilter: "⚡ 快速篩選：",
+            filterAll: "全部",
+            filterFridge: "❄️ 冷藏 4°C",
+            filterFreezer: "🧊 冷凍 -20°C",
+            filterCabinet: "🚪 常溫櫃 (B1-B5)",
+            filterToxic: "☠️ 毒化/管制",
+            filterHazard: "⚠️ 特殊危險 (酸鹼/氧化/禁水)",
             resultHeader: "查詢結果",
             thBarcode: "條碼",
             thName: "藥品名稱 (中/英)",
@@ -304,7 +339,7 @@
             thAction: "操作",
             initialText: "請點擊搜尋或輸入關鍵字",
             searching: "搜尋中...",
-            notFound: "查無相關藥品資料",
+            notFound: "查無符合條件的藥品資料",
             formTitleUser: "📝 編輯已入庫藥品資料",
             formTitleAdmin: "➕ 新增入庫 / 編輯藥品 (管理員模式)",
             lblBarcode: "瓶身條碼 *",
@@ -342,6 +377,13 @@
             searchLabel: "🔍 Chemical Search (English/Chinese Name, CAS No., Vendor, SMILES, Barcode, Location)",
             searchPlaceholder: "Type keywords (leave empty to list all)...",
             btnSearch: "Search",
+            lblQuickFilter: "⚡ Filter by:",
+            filterAll: "All",
+            filterFridge: "❄️ Fridge 4°C",
+            filterFreezer: "🧊 Freezer -20°C",
+            filterCabinet: "🚪 Cabinet (B1-B5)",
+            filterToxic: "☠️ Toxic / Controlled",
+            filterHazard: "⚠️ Hazardous (Acid/Base/Ox/Reactive)",
             resultHeader: "Search Results",
             thBarcode: "Barcode",
             thName: "Chemical Name (EN/ZH)",
@@ -463,6 +505,20 @@
         document.getElementById('searchLabel').innerText = t.searchLabel;
         document.getElementById('searchInput').placeholder = t.searchPlaceholder;
         document.getElementById('btnSearch').innerText = t.btnSearch;
+        document.getElementById('lblQuickFilter').innerText = t.lblQuickFilter;
+        
+        // 標籤文字更新
+        const chips = document.querySelectorAll('.filter-chip');
+        chips.forEach(chip => {
+            const f = chip.getAttribute('data-filter');
+            if (f === 'all') chip.innerText = t.filterAll;
+            else if (f === 'fridge') chip.innerText = t.filterFridge;
+            else if (f === 'freezer') chip.innerText = t.filterFreezer;
+            else if (f === 'cabinet') chip.innerText = t.filterCabinet;
+            else if (f === 'toxic') chip.innerText = t.filterToxic;
+            else if (f === 'hazard') chip.innerText = t.filterHazard;
+        });
+
         document.getElementById('resultHeader').innerText = t.resultHeader;
         document.getElementById('thBarcode').innerText = t.thBarcode;
         document.getElementById('thName').innerText = t.thName;
@@ -497,7 +553,7 @@
         if (initialElem) initialElem.innerText = t.initialText;
 
         applyRoleUI();
-        renderResults();
+        filterAndRenderResults();
     }
 
     function switchScanMode(mode) {
@@ -519,10 +575,8 @@
         const feedback = document.getElementById('scanFeedback');
         feedback.style.display = 'block';
 
-        // 判斷是否為藥櫃條碼
         const isCabinetBarcode = cabinetMap[text] || text.startsWith("LOC-") || text.startsWith("CAB-");
 
-        // 情況 1：在「🔍 掃櫃查藥模式」下掃描了藥品櫃條碼
         if (isCabinetBarcode && currentOperationMode === 'view') {
             const cabinetName = cabinetMap[text] || text;
             feedback.className = 'mt-2 fw-bold text-primary';
@@ -531,12 +585,11 @@
             document.getElementById('searchInput').value = cabinetName;
             searchChemical();
             
-            toggleScanner(); // 查到後關閉相機直接檢視表格
+            toggleScanner();
             isProcessingScan = false;
             return;
         }
 
-        // 情況 2：在「📥 批量入櫃模式」下掃描了藥品櫃條碼（鎖定藥櫃）
         if (isCabinetBarcode && currentOperationMode === 'batch') {
             currentCabinet = cabinetMap[text] || text;
             document.getElementById('currentCabinetName').innerText = currentCabinet;
@@ -548,7 +601,6 @@
             return;
         }
 
-        // 情況 3：已鎖定藥櫃狀態下，掃描了藥品條碼（批量入櫃）
         if (currentCabinet) {
             feedback.className = 'mt-2 fw-bold text-primary';
             feedback.innerText = `🔄 正在將藥品 ${text} 歸入 ${currentCabinet}...`;
@@ -577,7 +629,6 @@
             return;
         }
 
-        // 情況 4：未鎖定藥櫃時掃描了普通藥品條碼（單瓶藥品查詢）
         document.getElementById('searchInput').value = text;
         searchChemical();
         toggleScanner();
@@ -677,6 +728,15 @@
         if (e.key === 'Enter') searchChemical();
     }
 
+    // 點擊 Filter Chip 切換過濾維度
+    function setFilter(type, elem) {
+        currentFilter = type;
+        const chips = document.querySelectorAll('.filter-chip');
+        chips.forEach(c => c.classList.remove('active'));
+        if (elem) elem.classList.add('active');
+        filterAndRenderResults();
+    }
+
     async function searchChemical() {
         const t = dict[currentLang];
         const query = document.getElementById('searchInput').value.trim();
@@ -689,17 +749,67 @@
             
             if (!res.ok) throw new Error('HTTP ' + res.status);
             
-            currentSearchResults = await res.json();
-            renderResults();
+            rawSearchResults = await res.json();
+            filterAndRenderResults();
         } catch (err) {
             tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger">${t.connFail} ${err.message}</td></tr>`;
         }
     }
 
+    // 核心前端過濾邏輯（秒級過濾）
+    function filterAndRenderResults() {
+        if (!rawSearchResults || rawSearchResults.length === 0) {
+            currentSearchResults = [];
+            renderResults();
+            return;
+        }
+
+        if (currentFilter === 'all') {
+            currentSearchResults = rawSearchResults;
+        } else if (currentFilter === 'fridge') {
+            // 冷藏：包含「冰箱A」、「冰箱B」(非冷凍)、「冷藏冰箱」、「R-1」
+            currentSearchResults = rawSearchResults.filter(item => {
+                const loc = (item.location || '').toLowerCase();
+                return (loc.includes('冰箱') || loc.includes('冷藏') || loc.includes('r-1')) && !loc.includes('冷凍');
+            });
+        } else if (currentFilter === 'freezer') {
+            // 冷凍：包含「冷凍」、「f-1」、「-20」
+            currentSearchResults = rawSearchResults.filter(item => {
+                const loc = (item.location || '').toLowerCase();
+                return loc.includes('冷凍') || loc.includes('f-1') || loc.includes('-20');
+            });
+        } else if (currentFilter === 'cabinet') {
+            // 常溫主櫃：包含「藥品櫃」、「b-1」~「b-5」、「架」、「箱」
+            currentSearchResults = rawSearchResults.filter(item => {
+                const loc = (item.location || '').toLowerCase();
+                return loc.includes('藥品櫃') || loc.includes('b-') || loc.includes('架') || loc.includes('箱') || loc.includes('櫃');
+            });
+        } else if (currentFilter === 'toxic') {
+            // 毒化/管制：包含「毒」、「管制」
+            currentSearchResults = rawSearchResults.filter(item => {
+                const safe = (item.safety_class || '').toLowerCase();
+                const loc = (item.location || '').toLowerCase();
+                return safe.includes('毒') || safe.includes('管制') || loc.includes('毒');
+            });
+        } else if (currentFilter === 'hazard') {
+            // 特殊危險品：包含「酸」、「鹼」、「氧化」、「禁水」、「腐蝕」、「易燃」
+            currentSearchResults = rawSearchResults.filter(item => {
+                const safe = (item.safety_class || '').toLowerCase();
+                const loc = (item.location || '').toLowerCase();
+                return safe.includes('酸') || safe.includes('鹼') || safe.includes('氧化') || safe.includes('禁水') || safe.includes('腐蝕') || safe.includes('易燃') || loc.includes('酸鹼') || loc.includes('防爆');
+            });
+        }
+
+        renderResults();
+    }
+
     function renderResults() {
         const t = dict[currentLang];
         const tbody = document.getElementById('resultBody');
+        const countBadge = document.getElementById('resultCountBadge');
         tbody.innerHTML = '';
+
+        countBadge.innerText = `${currentSearchResults.length} 筆資料`;
 
         if (!currentSearchResults || currentSearchResults.length === 0) {
             tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger" id="initialText">${t.notFound}</td></tr>`;

@@ -1,324 +1,238 @@
-from fastapi import FastAPI, Query, Header, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
-from pydantic import BaseModel
-from typing import Optional
 import os
-import io
-import urllib.request
-import json
+from fastapi import FastAPI, HTTPException, Header
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse
+from pydantic import BaseModel
 import psycopg2
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import pandas as pd
 
 app = FastAPI()
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
-ADMIN_KEY = os.environ.get("ADMIN_KEY", "labadmin2026")
-GOOGLE_SHEET_WEBHOOK = os.environ.get("GOOGLE_SHEET_WEBHOOK", "")
+# 啟用 CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+ADMIN_KEY = os.getenv("ADMIN_KEY", "labadmin2026")
+GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME", "實驗室藥品清冊")
+CREDENTIALS_FILE = "credentials.json"
 
 def get_db_connection():
-    if DATABASE_URL:
-        url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-        return psycopg2.connect(url, sslmode='require')
-    else:
-        import sqlite3
-        return sqlite3.connect("lab_chemicals.db")
+    if not DATABASE_URL:
+        raise HTTPException(status_code=500, detail="未設定 DATABASE_URL 環境變數")
+    return psycopg2.connect(DATABASE_URL)
 
-def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    if DATABASE_URL:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS chemicals (
-                barcode VARCHAR(255) PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                chinese_name VARCHAR(255),
-                cas_no VARCHAR(255),
-                smiles VARCHAR(255),
-                formula VARCHAR(255),
-                mw VARCHAR(255),
-                safety_class VARCHAR(255),
-                location VARCHAR(255),
-                spec VARCHAR(255),
-                vendor VARCHAR(255),
-                note VARCHAR(255)
-            );
-        """)
-        # 自動為已存在的舊資料表補上 chinese_name 與 vendor 欄位
-        cursor.execute("""
-            DO $$ 
-            BEGIN 
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chemicals' AND column_name='chinese_name') THEN 
-                    ALTER TABLE chemicals ADD COLUMN chinese_name VARCHAR(255); 
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chemicals' AND column_name='vendor') THEN 
-                    ALTER TABLE chemicals ADD COLUMN vendor VARCHAR(255); 
-                END IF;
-            END $$;
-        """)
-    else:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS chemicals (
-                barcode TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                chinese_name TEXT,
-                cas_no TEXT,
-                smiles TEXT,
-                formula TEXT,
-                mw TEXT,
-                safety_class TEXT,
-                location TEXT,
-                spec TEXT,
-                vendor TEXT,
-                note TEXT
-            )
-        """)
-        try:
-            cursor.execute("ALTER TABLE chemicals ADD COLUMN chinese_name TEXT;")
-        except:
-            pass
-        try:
-            cursor.execute("ALTER TABLE chemicals ADD COLUMN vendor TEXT;")
-        except:
-            pass
+def sync_to_google_sheet(payload: dict):
+    if not os.path.exists(CREDENTIALS_FILE):
+        return
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+        client = gspread.authorize(creds)
+        sheet = client.open(GOOGLE_SHEET_NAME).sheet1
+        
+        # 尋找是否已有該條碼
+        cell = sheet.find(payload["barcode"])
+        row_data = [
+            payload["barcode"], payload["name"], payload.get("chinese_name", "-"),
+            payload.get("cas_no", "-"), payload.get("smiles", "-"),
+            payload.get("formula", "-"), payload.get("mw", "-"),
+            payload.get("safety_class", "-"), payload.get("location", "-"),
+            payload.get("spec", "-"), payload.get("vendor", "-"), payload.get("note", "-")
+        ]
+        if cell:
+            sheet.update(f"A{cell.row}:L{cell.row}", [row_data])
+        else:
+            sheet.append_row(row_data)
+    except Exception as e:
+        print(f"Google Sheets 同步失敗: {e}")
 
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-init_db()
-
-class Chemical(BaseModel):
+class ChemicalPayload(BaseModel):
     barcode: str
     name: str
-    chinese_name: Optional[str] = ""
-    cas_no: Optional[str] = ""
-    smiles: Optional[str] = ""
-    formula: Optional[str] = ""
-    mw: Optional[str] = ""
-    safety_class: Optional[str] = ""
-    location: Optional[str] = ""
-    spec: Optional[str] = ""
-    vendor: Optional[str] = ""
-    note: Optional[str] = ""
+    chinese_name: str = "-"
+    cas_no: str = "-"
+    smiles: str = "-"
+    formula: str = "-"
+    mw: str = "-"
+    safety_class: str = "-"
+    location: str = "-"
+    spec: str = "-"
+    vendor: str = "-"
+    note: str = "-"
 
-class UpdateLocationPayload(BaseModel):
+class LocationUpdatePayload(BaseModel):
     barcode: str
     location: str
 
-def sync_to_google_sheet(payload_dict: dict):
-    if not GOOGLE_SHEET_WEBHOOK:
-        return
-    try:
-        req = urllib.request.Request(
-            GOOGLE_SHEET_WEBHOOK,
-            data=json.dumps(payload_dict).encode('utf-8'),
-            headers={'Content-Type': 'application/json'}
-        )
-        urllib.request.urlopen(req, timeout=10)
-    except Exception as e:
-        print(f"Sync to Google Sheet failed: {e}")
+class VerifyPayload(BaseModel):
+    key: str
 
-@app.get("/")
-def read_root():
-    return FileResponse("index.html")
-
-def verify_admin(x_admin_key: Optional[str] = Header(None)):
-    if x_admin_key != ADMIN_KEY:
-        raise HTTPException(status_code=403, detail="權限不足：需要管理員權限")
+@app.get("/", response_class=HTMLResponse)
+def serve_index():
+    if os.path.exists("index.html"):
+        with open("index.html", "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h1>系統運作中，未找到 index.html</h1>"
 
 @app.post("/api/verify_key")
-def check_key(payload: dict):
-    if payload.get("key") == ADMIN_KEY:
-        return {"status": "success", "role": "admin"}
-    return {"status": "error", "message": "密碼錯誤"}
+def verify_key(payload: VerifyPayload):
+    if payload.key == ADMIN_KEY:
+        return {"status": "success", "message": "驗證通過"}
+    raise HTTPException(status_code=401, detail="密碼錯誤")
 
 @app.get("/api/search")
-def search_chemical(q: str = Query("")):
+def search_chemicals(q: str = ""):
     conn = get_db_connection()
     cursor = conn.cursor()
-    keyword = f"%{q.strip()}%"
+    query_str = q.strip()
     
-    if DATABASE_URL:
-        if not q.strip():
-            cursor.execute("SELECT barcode, name, chinese_name, cas_no, smiles, formula, mw, safety_class, location, spec, vendor, note FROM chemicals LIMIT 100")
-        else:
-            cursor.execute("""
-                SELECT barcode, name, chinese_name, cas_no, smiles, formula, mw, safety_class, location, spec, vendor, note 
-                FROM chemicals 
-                WHERE barcode ILIKE %s 
-                   OR name ILIKE %s 
-                   OR chinese_name ILIKE %s
-                   OR cas_no ILIKE %s 
-                   OR smiles ILIKE %s 
-                   OR location ILIKE %s 
-                   OR safety_class ILIKE %s
-                   OR vendor ILIKE %s
-            """, (keyword, keyword, keyword, keyword, keyword, keyword, keyword, keyword))
+    # 支援上限放寬至 2000 筆，並強制以 barcode ASC 升冪排序
+    if not query_str:
+        sql = """
+            SELECT barcode, name, chinese_name, cas_no, smiles, formula, mw, 
+                   safety_class, location, spec, vendor, note 
+            FROM chemicals 
+            ORDER BY barcode ASC 
+            LIMIT 2000;
+        """
+        cursor.execute(sql)
     else:
-        if not q.strip():
-            cursor.execute("SELECT barcode, name, chinese_name, cas_no, smiles, formula, mw, safety_class, location, spec, vendor, note FROM chemicals LIMIT 100")
-        else:
-            cursor.execute("""
-                SELECT barcode, name, chinese_name, cas_no, smiles, formula, mw, safety_class, location, spec, vendor, note 
-                FROM chemicals 
-                WHERE barcode LIKE ? 
-                   OR name LIKE ? 
-                   OR chinese_name LIKE ?
-                   OR cas_no LIKE ? 
-                   OR smiles LIKE ? 
-                   OR location LIKE ? 
-                   OR safety_class LIKE ?
-                   OR vendor LIKE ?
-            """, (keyword, keyword, keyword, keyword, keyword, keyword, keyword, keyword))
-            
+        sql = """
+            SELECT barcode, name, chinese_name, cas_no, smiles, formula, mw, 
+                   safety_class, location, spec, vendor, note 
+            FROM chemicals 
+            WHERE barcode ILIKE %s 
+               OR name ILIKE %s 
+               OR chinese_name ILIKE %s 
+               OR cas_no ILIKE %s 
+               OR location ILIKE %s 
+               OR vendor ILIKE %s 
+            ORDER BY barcode ASC 
+            LIMIT 2000;
+        """
+        pat = f"%{query_str}%"
+        cursor.execute(sql, (pat, pat, pat, pat, pat, pat))
+        
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
-    
+
     results = []
-    for row in rows:
+    for r in rows:
         results.append({
-            "barcode": row[0] or "",
-            "name": row[1] or "",
-            "chinese_name": row[2] if row[2] else "-",
-            "cas_no": row[3] if row[3] else "-",
-            "smiles": row[4] if row[4] else "-",
-            "formula": row[5] if row[5] else "-",
-            "mw": row[6] if row[6] else "-",
-            "safety_class": row[7] if row[7] else "-",
-            "location": row[8] if row[8] else "-",
-            "spec": row[9] if row[9] else "-",
-            "vendor": row[10] if row[10] else "-",
-            "note": row[11] if row[11] else "-"
+            "barcode": r[0],
+            "name": r[1] or "-",
+            "chinese_name": r[2] or "-",
+            "cas_no": r[3] or "-",
+            "smiles": r[4] or "-",
+            "formula": r[5] or "-",
+            "mw": str(r[6]) if r[6] is not None else "-",
+            "safety_class": r[7] or "-",
+            "location": r[8] or "-",
+            "spec": r[9] or "-",
+            "vendor": r[10] or "-",
+            "note": r[11] or "-"
         })
     return results
 
 @app.post("/api/update_location")
-def update_chemical_location(payload: UpdateLocationPayload, background_tasks: BackgroundTasks):
+def update_location(payload: LocationUpdatePayload):
     conn = get_db_connection()
     cursor = conn.cursor()
-    try:
-        if DATABASE_URL:
-            cursor.execute("UPDATE chemicals SET location = %s WHERE barcode = %s RETURNING name, chinese_name, cas_no, smiles, formula, mw, safety_class, spec, vendor, note;", (payload.location, payload.barcode))
-            row = cursor.fetchone()
-        else:
-            cursor.execute("UPDATE chemicals SET location = ? WHERE barcode = ?", (payload.location, payload.barcode))
-            cursor.execute("SELECT name, chinese_name, cas_no, smiles, formula, mw, safety_class, spec, vendor, note FROM chemicals WHERE barcode = ?", (payload.barcode,))
-            row = cursor.fetchone()
-            
-        conn.commit()
+    cursor.execute("SELECT name FROM chemicals WHERE barcode = %s", (payload.barcode,))
+    row = cursor.fetchone()
+    if not row:
         cursor.close()
         conn.close()
-        
-        if row:
-            chem_data = {
-                "barcode": payload.barcode,
-                "name": row[0],
-                "chinese_name": row[1] or "",
-                "cas_no": row[2] or "",
-                "smiles": row[3] or "",
-                "formula": row[4] or "",
-                "mw": row[5] or "",
-                "safety_class": row[6] or "",
-                "location": payload.location,
-                "spec": row[7] or "",
-                "vendor": row[8] or "",
-                "note": row[9] or ""
-            }
-            background_tasks.add_task(sync_to_google_sheet, chem_data)
-            disp_name = f"{row[0]} ({row[1]})" if row[1] else row[0]
-            return {"status": "success", "name": disp_name}
-        else:
-            return {"status": "error", "message": "此條碼未建檔"}
-    except Exception as e:
-        conn.close()
-        return {"status": "error", "message": str(e)}
-
-@app.post("/api/save_chemical")
-def save_chemical(chem: Chemical, background_tasks: BackgroundTasks, x_admin_key: Optional[str] = Header(None)):
-    conn = get_db_connection()
-    cursor = conn.cursor()
+        raise HTTPException(status_code=404, detail="查無此條碼藥品")
     
-    if DATABASE_URL:
-        cursor.execute("SELECT barcode FROM chemicals WHERE barcode = %s;", (chem.barcode,))
-    else:
-        cursor.execute("SELECT barcode FROM chemicals WHERE barcode = ?;", (chem.barcode,))
-    exists = cursor.fetchone() is not None
-
-    if not exists:
-        if x_admin_key != ADMIN_KEY:
-            cursor.close()
-            conn.close()
-            raise HTTPException(status_code=403, detail="全新藥品建檔入庫需要管理員權限！請先登入管理員。")
-
-    try:
-        if DATABASE_URL:
-            cursor.execute("""
-                INSERT INTO chemicals (barcode, name, chinese_name, cas_no, smiles, formula, mw, safety_class, location, spec, vendor, note)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (barcode) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    chinese_name = EXCLUDED.chinese_name,
-                    cas_no = EXCLUDED.cas_no,
-                    smiles = EXCLUDED.smiles,
-                    formula = EXCLUDED.formula,
-                    mw = EXCLUDED.mw,
-                    safety_class = EXCLUDED.safety_class,
-                    location = EXCLUDED.location,
-                    spec = EXCLUDED.spec,
-                    vendor = EXCLUDED.vendor,
-                    note = EXCLUDED.note;
-            """, (chem.barcode, chem.name, chem.chinese_name, chem.cas_no, chem.smiles, chem.formula, chem.mw, chem.safety_class, chem.location, chem.spec, chem.vendor, chem.note))
-        else:
-            cursor.execute("""
-                INSERT OR REPLACE INTO chemicals (barcode, name, chinese_name, cas_no, smiles, formula, mw, safety_class, location, spec, vendor, note)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (chem.barcode, chem.name, chem.chinese_name, chem.cas_no, chem.smiles, chem.formula, chem.mw, chem.safety_class, chem.location, chem.spec, chem.vendor, chem.note))
-            
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        background_tasks.add_task(sync_to_google_sheet, chem.dict())
-        
-        return {"status": "success", "mode": "update" if exists else "insert"}
-    except Exception as e:
-        conn.close()
-        return {"status": "error", "message": str(e)}
-
-@app.delete("/api/delete_chemical/{barcode}")
-def delete_chemical(barcode: str, x_admin_key: Optional[str] = Header(None)):
-    verify_admin(x_admin_key)
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    if DATABASE_URL:
-        cursor.execute("DELETE FROM chemicals WHERE barcode = %s", (barcode,))
-    else:
-        cursor.execute("DELETE FROM chemicals WHERE barcode = ?", (barcode,))
+    chem_name = row[0]
+    cursor.execute("UPDATE chemicals SET location = %s WHERE barcode = %s", (payload.location, payload.barcode))
     conn.commit()
     cursor.close()
     conn.close()
-    return {"status": "success"}
+
+    sync_to_google_sheet({"barcode": payload.barcode, "name": chem_name, "location": payload.location})
+    return {"status": "success", "name": chem_name, "location": payload.location}
+
+@app.post("/api/save_chemical")
+def save_chemical(payload: ChemicalPayload, x_admin_key: str = Header(None)):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT barcode FROM chemicals WHERE barcode = %s", (payload.barcode,))
+    exists = cursor.fetchone()
+
+    # 若為全新入庫藥品，必須驗證管理員身份
+    if not exists and x_admin_key != ADMIN_KEY:
+        cursor.close()
+        conn.close()
+        raise HTTPException(status_code=403, detail="全新藥品入庫建檔需要管理員權限")
+
+    mw_val = None
+    try:
+        if payload.mw and payload.mw != "-":
+            mw_val = float(payload.mw)
+    except:
+        pass
+
+    if exists:
+        sql = """
+            UPDATE chemicals 
+            SET name = %s, chinese_name = %s, cas_no = %s, smiles = %s, formula = %s, 
+                mw = %s, safety_class = %s, location = %s, spec = %s, vendor = %s, note = %s 
+            WHERE barcode = %s;
+        """
+        cursor.execute(sql, (
+            payload.name, payload.chinese_name, payload.cas_no, payload.smiles, payload.formula,
+            mw_val, payload.safety_class, payload.location, payload.spec, payload.vendor, payload.note,
+            payload.barcode
+        ))
+        mode = "update"
+    else:
+        sql = """
+            INSERT INTO chemicals (barcode, name, chinese_name, cas_no, smiles, formula, mw, safety_class, location, spec, vendor, note)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+        """
+        cursor.execute(sql, (
+            payload.barcode, payload.name, payload.chinese_name, payload.cas_no, payload.smiles, payload.formula,
+            mw_val, payload.safety_class, payload.location, payload.spec, payload.vendor, payload.note
+        ))
+        mode = "insert"
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    sync_to_google_sheet(payload.dict())
+    return {"status": "success", "mode": mode}
+
+@app.delete("/api/delete_chemical/{barcode}")
+def delete_chemical(barcode: str, x_admin_key: str = Header(None)):
+    if x_admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="刪除藥品需要管理員權限")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM chemicals WHERE barcode = %s", (barcode,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"status": "success", "barcode": barcode}
 
 @app.get("/api/export/excel")
 def export_excel():
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT barcode, name, chinese_name, cas_no, formula, mw, safety_class, location, spec, vendor, note, smiles FROM chemicals ORDER BY barcode ASC")
-    rows = cursor.fetchall()
-    cursor.close()
+    df = pd.read_sql("SELECT barcode AS 條碼, name AS 英文名稱, chinese_name AS 中文名稱, cas_no AS CAS, formula AS 分子式, mw AS 分子量, safety_class AS 安衛分類, location AS 擺放位置, spec AS 規格, vendor AS 廠商, note AS 備註 FROM chemicals ORDER BY barcode ASC", conn)
     conn.close()
-
-    output = io.StringIO()
-    output.write('\ufeff')
-    output.write("條碼,英文名稱,中文名稱,CAS No.,分子式,分子量(g/mol),安衛分類,位置座標,規格,廠商,備註,SMILES\n")
-    for r in rows:
-        row_clean = [f'"{str(val or "").replace(chr(34), chr(34)+chr(34))}"' for val in r]
-        output.write(",".join(row_clean) + "\n")
     
-    mem = io.BytesIO(output.getvalue().encode('utf-8-sig'))
-    output.close()
-    return StreamingResponse(
-        mem,
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": "attachment; filename=chemicals_inventory.csv"}
-    )
+    file_path = "chemicals_export.xlsx"
+    df.to_excel(file_path, index=False)
+    return FileResponse(file_path, filename="實驗室藥品清冊.xlsx")

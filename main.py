@@ -4,13 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 import psycopg2
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 
 app = FastAPI()
 
-# 啟用 CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,38 +18,11 @@ app.add_middleware(
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 ADMIN_KEY = os.getenv("ADMIN_KEY", "labadmin2026")
-GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME", "實驗室藥品清冊")
-CREDENTIALS_FILE = "credentials.json"
 
 def get_db_connection():
     if not DATABASE_URL:
         raise HTTPException(status_code=500, detail="未設定 DATABASE_URL 環境變數")
     return psycopg2.connect(DATABASE_URL)
-
-def sync_to_google_sheet(payload: dict):
-    if not os.path.exists(CREDENTIALS_FILE):
-        return
-    try:
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
-        client = gspread.authorize(creds)
-        sheet = client.open(GOOGLE_SHEET_NAME).sheet1
-        
-        # 尋找是否已有該條碼
-        cell = sheet.find(payload["barcode"])
-        row_data = [
-            payload["barcode"], payload["name"], payload.get("chinese_name", "-"),
-            payload.get("cas_no", "-"), payload.get("smiles", "-"),
-            payload.get("formula", "-"), payload.get("mw", "-"),
-            payload.get("safety_class", "-"), payload.get("location", "-"),
-            payload.get("spec", "-"), payload.get("vendor", "-"), payload.get("note", "-")
-        ]
-        if cell:
-            sheet.update(f"A{cell.row}:L{cell.row}", [row_data])
-        else:
-            sheet.append_row(row_data)
-    except Exception as e:
-        print(f"Google Sheets 同步失敗: {e}")
 
 class ChemicalPayload(BaseModel):
     barcode: str
@@ -94,7 +64,7 @@ def search_chemicals(q: str = ""):
     cursor = conn.cursor()
     query_str = q.strip()
     
-    # 支援上限放寬至 2000 筆，並強制以 barcode ASC 升冪排序
+    # 放寬至 2000 筆，並以 barcode ASC 嚴格遞增排序
     if not query_str:
         sql = """
             SELECT barcode, name, chinese_name, cas_no, smiles, formula, mw, 
@@ -160,7 +130,6 @@ def update_location(payload: LocationUpdatePayload):
     cursor.close()
     conn.close()
 
-    sync_to_google_sheet({"barcode": payload.barcode, "name": chem_name, "location": payload.location})
     return {"status": "success", "name": chem_name, "location": payload.location}
 
 @app.post("/api/save_chemical")
@@ -170,7 +139,6 @@ def save_chemical(payload: ChemicalPayload, x_admin_key: str = Header(None)):
     cursor.execute("SELECT barcode FROM chemicals WHERE barcode = %s", (payload.barcode,))
     exists = cursor.fetchone()
 
-    # 若為全新入庫藥品，必須驗證管理員身份
     if not exists and x_admin_key != ADMIN_KEY:
         cursor.close()
         conn.close()
@@ -211,7 +179,6 @@ def save_chemical(payload: ChemicalPayload, x_admin_key: str = Header(None)):
     cursor.close()
     conn.close()
 
-    sync_to_google_sheet(payload.dict())
     return {"status": "success", "mode": mode}
 
 @app.delete("/api/delete_chemical/{barcode}")

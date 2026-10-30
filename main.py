@@ -1,10 +1,11 @@
 import os
-from fastapi import FastAPI, HTTPException, Header
+import csv
+import io
+from fastapi import FastAPI, HTTPException, Header, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import psycopg2
-import pandas as pd
 
 app = FastAPI()
 
@@ -194,12 +195,33 @@ def delete_chemical(barcode: str, x_admin_key: str = Header(None)):
     conn.close()
     return {"status": "success", "barcode": barcode}
 
+# 內建 csv 模組匯出，免安裝 pandas，保證 Excel 打開不亂碼
 @app.get("/api/export/excel")
 def export_excel():
     conn = get_db_connection()
-    df = pd.read_sql("SELECT barcode AS 條碼, name AS 英文名稱, chinese_name AS 中文名稱, cas_no AS CAS, formula AS 分子式, mw AS 分子量, safety_class AS 安衛分類, location AS 擺放位置, spec AS 規格, vendor AS 廠商, note AS 備註 FROM chemicals ORDER BY barcode ASC", conn)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT barcode, name, chinese_name, cas_no, formula, mw, safety_class, location, spec, vendor, note 
+        FROM chemicals 
+        ORDER BY barcode ASC;
+    """)
+    rows = cursor.fetchall()
+    cursor.close()
     conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
     
-    file_path = "chemicals_export.xlsx"
-    df.to_excel(file_path, index=False)
-    return FileResponse(file_path, filename="實驗室藥品清冊.xlsx")
+    # 寫入表頭
+    writer.writerow(["條碼", "英文名稱", "中文名稱", "CAS", "分子式", "分子量", "安衛分類", "擺放位置", "規格", "廠商", "備註"])
+    for row in rows:
+        writer.writerow(row)
+        
+    csv_data = output.getvalue()
+    
+    # 加入 UTF-8 BOM (\ufeff)，確保 Excel 直接點開中文不會變成亂碼
+    return Response(
+        content="\ufeff" + csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=chemicals_export.csv"}
+    )

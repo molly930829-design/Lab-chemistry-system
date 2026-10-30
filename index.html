@@ -47,6 +47,16 @@
             padding: 15px;
             margin-bottom: 20px;
         }
+
+        /* 分頁器樣式 */
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
     </style>
 </head>
 <body>
@@ -60,8 +70,8 @@
 
     <h2 class="text-center mb-4" id="title">🧪 實驗室藥品精密管理系統</h2>
 
-    <!-- 相機掃描區（整合查藥與入櫃雙模式） -->
-    <div class="card mb-4">
+    <!-- 1. 相機掃描區（整合查藥與入櫃雙模式） -->
+    <div class="card mb-4 shadow-sm">
         <div class="card-header bg-primary text-white fw-bold d-flex justify-content-between align-items-center flex-wrap gap-2">
             <span id="scanHeader">相機條碼掃描</span>
             <div class="btn-group btn-group-sm" role="group">
@@ -87,7 +97,132 @@
         </div>
     </div>
 
-    <!-- 搜尋區與即時過濾標籤 -->
+    <!-- 2. 藥品編輯 / 新增表單區塊（置於鏡頭下方、藥品上方） -->
+    <div id="formSection" class="card mb-4 shadow-sm border-secondary border-opacity-25">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 id="formHeaderTitle" class="mb-0 text-dark fw-bold">📝 編輯已入庫藥品資料</h4>
+                <span id="formRoleBadge" class="badge bg-secondary">所有人皆可編輯已入庫藥品</span>
+            </div>
+
+            <!-- 重複藥品即時提醒橫幅 -->
+            <div id="duplicateAlert" class="duplicate-alert">
+                <div class="d-flex align-items-center justify-content-between">
+                    <h5 class="fw-bold text-danger mb-0">⚠️ 發現庫存中已有相同藥品！</h5>
+                    <button type="button" class="btn-close" onclick="document.getElementById('duplicateAlert').style.display='none'"></button>
+                </div>
+                <div class="mt-2 text-dark" id="duplicateDetails"></div>
+                <small class="text-muted d-block mt-2">提示：若此瓶為新購入的同款備用藥，您仍可正常填寫條碼並點擊下方按鈕完成入庫。</small>
+            </div>
+
+            <form id="addForm" onsubmit="saveChemical(event)">
+                <div class="row g-3">
+                    <!-- 第一排：核心標識 (共 12 格) -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold" id="lblBarcode">瓶身條碼 *</label>
+                        <input type="text" id="addBarcode" class="form-control" placeholder="例如：CHEM-00001" required>
+                        <small class="text-muted" id="barcodeTip">（新條碼入庫需管理員）</small>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold" id="lblCas">CAS Number</label>
+                        <div class="input-group">
+                            <input type="text" id="addCas" class="form-control" placeholder="例如：64-17-5" onblur="checkDuplicateChemical()">
+                            <button class="btn btn-primary" type="button" onclick="fetchPubChemByCas()" id="btnFetchCas">🔍 自動帶入</button>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold" id="lblName">英文名稱 *</label>
+                        <input type="text" id="addName" class="form-control" placeholder="例如：Ethanol" required onblur="checkDuplicateChemical()">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold" id="lblChineseName">中文名稱</label>
+                        <input type="text" id="addChineseName" class="form-control" placeholder="例如：乙醇">
+                    </div>
+
+                    <!-- 第二排：結構式與理化性質 (共 12 格) -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold" id="lblSmiles">SMILES 結構式</label>
+                        <input type="text" id="addSmiles" class="form-control" placeholder="輸入 CAS 自動帶入或手動貼上" oninput="previewStructure()">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold" id="lblFormula">分子式 (Formula)</label>
+                        <input type="text" id="addFormula" class="form-control" placeholder="例如：C2H6O">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold" id="lblMw">分子量 (MW, g/mol)</label>
+                        <input type="text" id="addMw" class="form-control" placeholder="例如：46.07">
+                    </div>
+
+                    <!-- 第三排：分類、位置、規格、廠商與備註 (3+3+2+2+2 = 12 格) -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold" id="lblSafety">安衛分類 *</label>
+                        <input type="text" id="addSafety" list="safetyOptions" class="form-control" placeholder="可選取或輸入分類" required>
+                        <datalist id="safetyOptions">
+                            <option value="一般藥品"></option>
+                            <option value="易燃液體"></option>
+                            <option value="毒性物質"></option>
+                            <option value="腐蝕性物質"></option>
+                            <option value="強氧化劑"></option>
+                            <option value="禁水性物質"></option>
+                            <option value="管制藥品"></option>
+                        </datalist>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold" id="lblLocation">擺放位置座標 *</label>
+                        <input type="text" id="addLocation" list="locationOptions" class="form-control" placeholder="可選取或輸入位置" required>
+                        <datalist id="locationOptions">
+                            <option value="防爆櫃 A-1"></option>
+                            <option value="防爆櫃 A-2"></option>
+                            <option value="藥品櫃 B-1"></option>
+                            <option value="藥品櫃 B-2"></option>
+                            <option value="藥品櫃 B-3"></option>
+                            <option value="藥品櫃 B-4"></option>
+                            <option value="藥品櫃 B-5"></option>
+                            <option value="毒化物櫃 T-1"></option>
+                            <option value="酸鹼櫃 C-1"></option>
+                            <option value="冷藏冰箱 R-1"></option>
+                            <option value="冷凍冰箱 F-1"></option>
+                        </datalist>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold" id="lblSpec">規格 / 純度</label>
+                        <input type="text" id="addSpec" class="form-control" placeholder="500mL / 99%">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-success" id="lblVendor">廠商 (Vendor)</label>
+                        <input type="text" id="addVendor" list="vendorOptions" class="form-control border-success" placeholder="選取或填寫廠商">
+                        <datalist id="vendorOptions">
+                            <option value="Sigma-Aldrich"></option>
+                            <option value="Merck"></option>
+                            <option value="Alfa Aesar"></option>
+                            <option value="TCI (東京化成)"></option>
+                            <option value="Acros Organics"></option>
+                            <option value="Thermo Fisher"></option>
+                            <option value="BLD Pharm"></option>
+                            <option value="J.T. Baker"></option>
+                            <option value="台塑 / 景明"></option>
+                            <option value="友和"></option>
+                        </datalist>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary" id="lblNote">備註</label>
+                        <input type="text" id="addNote" class="form-control" placeholder="開瓶日、保管人...">
+                    </div>
+
+                    <div class="col-12 text-center" id="previewBox" style="display:none;">
+                        <label class="form-label fw-bold text-success">✨ 2D 分子結構預覽：</label><br>
+                        <canvas id="previewCanvas" width="220" height="150" class="chem-canvas shadow-sm p-2"></canvas>
+                    </div>
+
+                    <div class="col-12 mt-4">
+                        <button type="submit" class="btn btn-success w-100 fw-bold py-2" id="btnSubmit">💾 儲存修改 / 入庫建檔</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 3. 搜尋區與即時過濾標籤 -->
     <div class="mb-4">
         <label for="searchInput" class="form-label fw-bold" id="searchLabel">🔍 藥品搜尋 (支援中英文名稱模糊搜尋、CAS No.、廠商、SMILES 結構式、條碼、擺放位置)</label>
         <div class="input-group">
@@ -107,12 +242,12 @@
         </div>
     </div>
 
-    <!-- 查詢結果表格 -->
+    <!-- 4. 查詢結果表格與筆數統計 -->
     <div class="d-flex justify-content-between align-items-center mb-2">
         <h4 id="resultHeader" class="mb-0">查詢結果</h4>
-        <span id="resultCountBadge" class="badge bg-secondary">0 筆資料</span>
+        <span id="resultCountBadge" class="badge bg-secondary fs-6">0 筆資料</span>
     </div>
-    <div class="table-responsive mb-4">
+    <div class="table-responsive mb-2">
         <table class="table table-bordered table-hover align-middle">
             <thead class="table-light">
                 <tr>
@@ -135,128 +270,10 @@
         </table>
     </div>
 
-    <!-- 藥品編輯 / 新增表單區塊 -->
-    <div id="formSection">
-        <hr>
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h4 id="formHeaderTitle" class="mb-0">📝 編輯已入庫藥品資料</h4>
-            <span id="formRoleBadge" class="badge bg-secondary">所有人皆可編輯已入庫藥品</span>
-        </div>
-
-        <!-- 重複藥品即時提醒橫幅 -->
-        <div id="duplicateAlert" class="duplicate-alert">
-            <div class="d-flex align-items-center justify-content-between">
-                <h5 class="fw-bold text-danger mb-0">⚠️ 發現庫存中已有相同藥品！</h5>
-                <button type="button" class="btn-close" onclick="document.getElementById('duplicateAlert').style.display='none'"></button>
-            </div>
-            <div class="mt-2 text-dark" id="duplicateDetails"></div>
-            <small class="text-muted d-block mt-2">提示：若此瓶為新購入的同款備用藥，您仍可正常填寫條碼並點擊下方按鈕完成入庫。</small>
-        </div>
-
-        <form id="addForm" onsubmit="saveChemical(event)">
-            <div class="row g-3">
-                <!-- 第一排：核心標識 (共 12 格) -->
-                <div class="col-md-3">
-                    <label class="form-label fw-bold" id="lblBarcode">瓶身條碼 *</label>
-                    <input type="text" id="addBarcode" class="form-control" placeholder="例如：CHEM-00001" required>
-                    <small class="text-muted" id="barcodeTip">（新條碼入庫需管理員）</small>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-bold" id="lblCas">CAS Number</label>
-                    <div class="input-group">
-                        <input type="text" id="addCas" class="form-control" placeholder="例如：64-17-5" onblur="checkDuplicateChemical()">
-                        <button class="btn btn-primary" type="button" onclick="fetchPubChemByCas()" id="btnFetchCas">🔍 自動帶入</button>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-bold" id="lblName">英文名稱 *</label>
-                    <input type="text" id="addName" class="form-control" placeholder="例如：Ethanol" required onblur="checkDuplicateChemical()">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-bold" id="lblChineseName">中文名稱</label>
-                    <input type="text" id="addChineseName" class="form-control" placeholder="例如：乙醇">
-                </div>
-
-                <!-- 第二排：結構式與理化性質 (共 12 格) -->
-                <div class="col-md-4">
-                    <label class="form-label fw-bold" id="lblSmiles">SMILES 結構式</label>
-                    <input type="text" id="addSmiles" class="form-control" placeholder="輸入 CAS 自動帶入或手動貼上" oninput="previewStructure()">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label fw-bold" id="lblFormula">分子式 (Formula)</label>
-                    <input type="text" id="addFormula" class="form-control" placeholder="例如：C2H6O">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label fw-bold" id="lblMw">分子量 (MW, g/mol)</label>
-                    <input type="text" id="addMw" class="form-control" placeholder="例如：46.07">
-                </div>
-
-                <!-- 第三排：分類、位置、規格、廠商與備註 (3+3+2+2+2 = 12 格) -->
-                <div class="col-md-3">
-                    <label class="form-label fw-bold" id="lblSafety">安衛分類 *</label>
-                    <input type="text" id="addSafety" list="safetyOptions" class="form-control" placeholder="可選取或輸入分類" required>
-                    <datalist id="safetyOptions">
-                        <option value="一般藥品"></option>
-                        <option value="易燃液體"></option>
-                        <option value="毒性物質"></option>
-                        <option value="腐蝕性物質"></option>
-                        <option value="強氧化劑"></option>
-                        <option value="禁水性物質"></option>
-                        <option value="管制藥品"></option>
-                    </datalist>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-bold" id="lblLocation">擺放位置座標 *</label>
-                    <input type="text" id="addLocation" list="locationOptions" class="form-control" placeholder="可選取或輸入位置" required>
-                    <datalist id="locationOptions">
-                        <option value="防爆櫃 A-1"></option>
-                        <option value="防爆櫃 A-2"></option>
-                        <option value="藥品櫃 B-1"></option>
-                        <option value="藥品櫃 B-2"></option>
-                        <option value="藥品櫃 B-3"></option>
-                        <option value="藥品櫃 B-4"></option>
-                        <option value="藥品櫃 B-5"></option>
-                        <option value="毒化物櫃 T-1"></option>
-                        <option value="酸鹼櫃 C-1"></option>
-                        <option value="冷藏冰箱 R-1"></option>
-                        <option value="冷凍冰箱 F-1"></option>
-                    </datalist>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-bold" id="lblSpec">規格 / 純度</label>
-                    <input type="text" id="addSpec" class="form-control" placeholder="500mL / 99%">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-bold text-success" id="lblVendor">廠商 (Vendor)</label>
-                    <input type="text" id="addVendor" list="vendorOptions" class="form-control border-success" placeholder="選取或填寫廠商">
-                    <datalist id="vendorOptions">
-                        <option value="Sigma-Aldrich"></option>
-                        <option value="Merck"></option>
-                        <option value="Alfa Aesar"></option>
-                        <option value="TCI (東京化成)"></option>
-                        <option value="Acros Organics"></option>
-                        <option value="Thermo Fisher"></option>
-                        <option value="BLD Pharm"></option>
-                        <option value="J.T. Baker"></option>
-                        <option value="台塑 / 景明"></option>
-                        <option value="友和"></option>
-                    </datalist>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-bold text-secondary" id="lblNote">備註</label>
-                    <input type="text" id="addNote" class="form-control" placeholder="開瓶日、保管人...">
-                </div>
-
-                <div class="col-12 text-center" id="previewBox" style="display:none;">
-                    <label class="form-label fw-bold text-success">✨ 2D 分子結構預覽：</label><br>
-                    <canvas id="previewCanvas" width="220" height="150" class="chem-canvas shadow-sm p-2"></canvas>
-                </div>
-
-                <div class="col-12 mt-4">
-                    <button type="submit" class="btn btn-success w-100 fw-bold py-2" id="btnSubmit">💾 儲存修改 / 入庫建檔</button>
-                </div>
-            </div>
-        </form>
+    <!-- 5. 前端分頁導航列 (每頁 100 筆) -->
+    <div class="pagination-container" id="paginationBox" style="display:none;">
+        <div class="text-muted small" id="pageInfoText">第 1 / 1 頁（每頁 100 筆）</div>
+        <ul class="pagination pagination-sm mb-0" id="paginationNav"></ul>
     </div>
 </div>
 
@@ -289,16 +306,21 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     let currentLang = 'zh';
-    let rawSearchResults = [];     // 保存後端傳回的原始資料
-    let currentSearchResults = []; // 當前過濾後顯示的資料
+    let rawSearchResults = [];     // 存放後端回傳的原始全部資料
+    let currentFilteredList = [];  // 存放通過過濾標籤後的資料
     let currentFilter = 'all';     // 當前過濾標籤
+    
+    // 分頁參數
+    const PAGE_SIZE = 100;
+    let currentPage = 1;
+
     let html5QrCode;
     let isScanning = false;
     let currentCabinet = null;
     let isProcessingScan = false;
     let isAdmin = false;
     let adminToken = localStorage.getItem('adminToken') || '';
-    let currentOperationMode = 'view'; // 'view': 掃櫃查藥模式, 'batch': 批量入櫃模式
+    let currentOperationMode = 'view';
 
     let smilesDrawer = new SmilesDrawer.Drawer({ width: 100, height: 70 });
     let bigDrawer = new SmilesDrawer.Drawer({ width: 350, height: 250 });
@@ -459,7 +481,7 @@
                 adminToken = '';
                 localStorage.removeItem('adminToken');
                 applyRoleUI();
-                renderResults();
+                renderPage();
             }
             return;
         }
@@ -483,7 +505,7 @@
                 bootstrap.Modal.getInstance(document.getElementById('authModal')).hide();
                 document.getElementById('adminPasswordInput').value = '';
                 applyRoleUI();
-                renderResults();
+                renderPage();
                 alert('🎉 成功登入管理員模式！您現在可新增全新藥品入庫及刪除藥品。');
             } else {
                 alert('密碼錯誤！');
@@ -655,7 +677,6 @@
         isProcessingScan = false;
     }
 
-    // 🌟 重複藥品檢查核心邏輯 (比對 CAS No. 與 英文名稱)
     async function checkDuplicateChemical() {
         const inputCas = document.getElementById('addCas').value.trim();
         const inputName = document.getElementById('addName').value.trim().toLowerCase();
@@ -670,17 +691,15 @@
 
         let duplicates = [];
 
-        // 1. 先從本地快取的搜尋結果比對
         if (rawSearchResults && rawSearchResults.length > 0) {
             duplicates = rawSearchResults.filter(item => {
-                if (item.barcode === currentBarcode) return false; // 排除當前編輯的自己
+                if (item.barcode === currentBarcode) return false;
                 const matchCas = inputCas && item.cas_no && item.cas_no !== '-' && item.cas_no === inputCas;
                 const matchName = inputName && item.name && item.name.toLowerCase() === inputName;
                 return matchCas || matchName;
             });
         }
 
-        // 2. 若本地未搜出且有填寫 CAS，直接呼叫後端 API 快速精準核對
         if (duplicates.length === 0 && inputCas) {
             try {
                 const res = await fetch('/api/search?q=' + encodeURIComponent(inputCas));
@@ -691,7 +710,6 @@
             } catch (e) {}
         }
 
-        // 3. 渲染重複警示內容
         if (duplicates.length > 0) {
             let html = '<div class="table-responsive mt-1"><table class="table table-sm table-bordered bg-white mb-0 align-middle">';
             html += '<thead class="table-warning"><tr><th>條碼</th><th>藥品名稱</th><th>現存櫃位座標</th><th>規格 / 廠商</th><th>備註</th></tr></thead><tbody>';
@@ -800,7 +818,6 @@
             if (fetchedName && !document.getElementById('addName').value.trim()) {
                 document.getElementById('addName').value = fetchedName;
             }
-            // 自動帶入完成後立刻執行重複比對
             checkDuplicateChemical();
             alert(`✨ 成功帶入結構與分子數據！\n・SMILES: ${smiles}\n・分子式: ${formula}\n・分子量: ${mw} g/mol`);
         } else {
@@ -814,6 +831,7 @@
 
     function setFilter(type, elem) {
         currentFilter = type;
+        currentPage = 1;
         const chips = document.querySelectorAll('.filter-chip');
         chips.forEach(c => c.classList.remove('active'));
         if (elem) elem.classList.add('active');
@@ -833,6 +851,11 @@
             if (!res.ok) throw new Error('HTTP ' + res.status);
             
             rawSearchResults = await res.json();
+            
+            // 本地排序一致性 (以 barcode 排序)
+            rawSearchResults.sort((a, b) => (a.barcode || '').localeCompare(b.barcode || '', undefined, { numeric: true }));
+            
+            currentPage = 1;
             filterAndRenderResults();
         } catch (err) {
             tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger">${t.connFail} ${err.message}</td></tr>`;
@@ -841,64 +864,76 @@
 
     function filterAndRenderResults() {
         if (!rawSearchResults || rawSearchResults.length === 0) {
-            currentSearchResults = [];
-            renderResults();
+            currentFilteredList = [];
+            renderPage();
             return;
         }
 
         if (currentFilter === 'all') {
-            currentSearchResults = rawSearchResults;
+            currentFilteredList = rawSearchResults;
         } else if (currentFilter === 'fridge') {
-            currentSearchResults = rawSearchResults.filter(item => {
+            currentFilteredList = rawSearchResults.filter(item => {
                 const loc = (item.location || '').toLowerCase();
                 return (loc.includes('冰箱') || loc.includes('冷藏') || loc.includes('r-1')) && !loc.includes('冷凍');
             });
         } else if (currentFilter === 'freezer') {
-            currentSearchResults = rawSearchResults.filter(item => {
+            currentFilteredList = rawSearchResults.filter(item => {
                 const loc = (item.location || '').toLowerCase();
                 return loc.includes('冷凍') || loc.includes('f-1') || loc.includes('-20');
             });
         } else if (currentFilter === 'cabinet') {
-            currentSearchResults = rawSearchResults.filter(item => {
+            currentFilteredList = rawSearchResults.filter(item => {
                 const loc = (item.location || '').toLowerCase();
                 return loc.includes('藥品櫃') || loc.includes('b-') || loc.includes('架') || loc.includes('箱') || loc.includes('櫃');
             });
         } else if (currentFilter === 'toxic') {
-            currentSearchResults = rawSearchResults.filter(item => {
+            currentFilteredList = rawSearchResults.filter(item => {
                 const safe = (item.safety_class || '').toLowerCase();
                 const loc = (item.location || '').toLowerCase();
                 return safe.includes('毒') || safe.includes('管制') || loc.includes('毒');
             });
         } else if (currentFilter === 'hazard') {
-            currentSearchResults = rawSearchResults.filter(item => {
+            currentFilteredList = rawSearchResults.filter(item => {
                 const safe = (item.safety_class || '').toLowerCase();
                 const loc = (item.location || '').toLowerCase();
                 return safe.includes('酸') || safe.includes('鹼') || safe.includes('氧化') || safe.includes('禁水') || safe.includes('腐蝕') || safe.includes('易燃') || loc.includes('酸鹼') || loc.includes('防爆');
             });
         }
 
-        renderResults();
+        renderPage();
     }
 
-    function renderResults() {
+    function renderPage() {
         const t = dict[currentLang];
         const tbody = document.getElementById('resultBody');
         const countBadge = document.getElementById('resultCountBadge');
+        const paginationBox = document.getElementById('paginationBox');
         tbody.innerHTML = '';
 
-        countBadge.innerText = `${currentSearchResults.length} 筆資料`;
+        const totalItems = currentFilteredList.length;
+        countBadge.innerText = `共 ${totalItems} 筆資料`;
 
-        if (!currentSearchResults || currentSearchResults.length === 0) {
+        if (totalItems === 0) {
             tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger" id="initialText">${t.notFound}</td></tr>`;
+            paginationBox.style.display = 'none';
             return;
         }
 
-        currentSearchResults.forEach((item, index) => {
+        const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        const startIndex = (currentPage - 1) * PAGE_SIZE;
+        const endIndex = Math.min(startIndex + PAGE_SIZE, totalItems);
+        const pageItems = currentFilteredList.slice(startIndex, endIndex);
+
+        pageItems.forEach((item, pageRelativeIndex) => {
             const tr = document.createElement('tr');
+            const globalIndex = startIndex + pageRelativeIndex;
             
             let structHtml = '-';
             if (item.smiles && item.smiles !== '-') {
-                structHtml = `<canvas id="canvas-${index}" width="100" height="70" class="chem-canvas"></canvas>`;
+                structHtml = `<canvas id="canvas-${globalIndex}" width="100" height="70" class="chem-canvas"></canvas>`;
             }
 
             const formulaMw = (item.formula !== '-' || item.mw !== '-') 
@@ -915,7 +950,7 @@
 
             let actionHtml = `
                 <td>
-                    <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="editChemical(${index})">${t.btnEdit}</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="editChemical(${globalIndex})">${t.btnEdit}</button>
                     ${deleteBtnHtml}
                 </td>
             `;
@@ -936,20 +971,94 @@
             tbody.appendChild(tr);
 
             if (item.smiles && item.smiles !== '-') {
-                const cvs = document.getElementById(`canvas-${index}`);
+                const cvs = document.getElementById(`canvas-${globalIndex}`);
                 if (cvs) {
                     cvs.onclick = () => showBigStruct(item.name, item.smiles, item.formula, item.mw, item.chinese_name);
                 }
             }
         });
 
-        currentSearchResults.forEach((item, index) => {
+        pageItems.forEach((item, pageRelativeIndex) => {
+            const globalIndex = startIndex + pageRelativeIndex;
             if (item.smiles && item.smiles !== '-') {
                 SmilesDrawer.parse(item.smiles, function (tree) {
-                    smilesDrawer.draw(tree, `canvas-${index}`, 'light', false);
+                    smilesDrawer.draw(tree, `canvas-${globalIndex}`, 'light', false);
                 });
             }
         });
+
+        renderPaginationControls(totalPages, totalItems);
+    }
+
+    function renderPaginationControls(totalPages, totalItems) {
+        const paginationBox = document.getElementById('paginationBox');
+        const pageInfoText = document.getElementById('pageInfoText');
+        const paginationNav = document.getElementById('paginationNav');
+
+        if (totalPages <= 1) {
+            paginationBox.style.display = totalItems > 0 ? 'flex' : 'none';
+            pageInfoText.innerText = `第 1 / 1 頁（每頁 ${PAGE_SIZE} 筆，共 ${totalItems} 筆）`;
+            paginationNav.innerHTML = '';
+            return;
+        }
+
+        paginationBox.style.display = 'flex';
+        pageInfoText.innerText = `第 ${currentPage} / ${totalPages} 頁（每頁 ${PAGE_SIZE} 筆，共 ${totalItems} 筆）`;
+        paginationNav.innerHTML = '';
+
+        const prevLi = document.createElement('li');
+        prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+        prevLi.innerHTML = `<a class="page-link" href="javascript:void(0)" onclick="goToPage(${currentPage - 1})">上一頁</a>`;
+        paginationNav.appendChild(prevLi);
+
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, currentPage + 2);
+
+        if (startPage > 1) {
+            const firstLi = document.createElement('li');
+            firstLi.className = 'page-item';
+            firstLi.innerHTML = `<a class="page-link" href="javascript:void(0)" onclick="goToPage(1)">1</a>`;
+            paginationNav.appendChild(firstLi);
+
+            if (startPage > 2) {
+                const dotsLi = document.createElement('li');
+                dotsLi.className = 'page-item disabled';
+                dotsLi.innerHTML = `<span class="page-link">...</span>`;
+                paginationNav.appendChild(dotsLi);
+            }
+        }
+
+        for (let p = startPage; p <= endPage; p++) {
+            const pageLi = document.createElement('li');
+            pageLi.className = `page-item ${p === currentPage ? 'active' : ''}`;
+            pageLi.innerHTML = `<a class="page-link" href="javascript:void(0)" onclick="goToPage(${p})">${p}</a>`;
+            paginationNav.appendChild(pageLi);
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                const dotsLi = document.createElement('li');
+                dotsLi.className = 'page-item disabled';
+                dotsLi.innerHTML = `<span class="page-link">...</span>`;
+                paginationNav.appendChild(dotsLi);
+            }
+
+            const lastLi = document.createElement('li');
+            lastLi.className = 'page-item';
+            lastLi.innerHTML = `<a class="page-link" href="javascript:void(0)" onclick="goToPage(${totalPages})">${totalPages}</a>`;
+            paginationNav.appendChild(lastLi);
+        }
+
+        const nextLi = document.createElement('li');
+        nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+        nextLi.innerHTML = `<a class="page-link" href="javascript:void(0)" onclick="goToPage(${currentPage + 1})">下一頁</a>`;
+        paginationNav.appendChild(nextLi);
+    }
+
+    function goToPage(page) {
+        currentPage = page;
+        renderPage();
+        document.getElementById('resultHeader').scrollIntoView({ behavior: 'smooth' });
     }
 
     function showBigStruct(name, smiles, formula, mw, chineseName) {
@@ -980,8 +1089,8 @@
         });
     }
 
-    function editChemical(index) {
-        const item = currentSearchResults[index];
+    function editChemical(globalIndex) {
+        const item = currentFilteredList[globalIndex];
         document.getElementById('addBarcode').value = item.barcode;
         document.getElementById('addName').value = item.name;
         document.getElementById('addChineseName').value = item.chinese_name === '-' ? '' : item.chinese_name;
@@ -995,9 +1104,7 @@
         document.getElementById('addVendor').value = item.vendor === '-' ? '' : item.vendor;
         document.getElementById('addNote').value = item.note === '-' ? '' : item.note;
         
-        // 進入編輯時先隱藏警示
         document.getElementById('duplicateAlert').style.display = 'none';
-
         previewStructure();
         document.getElementById('formSection').scrollIntoView({ behavior: 'smooth' });
     }
@@ -1094,7 +1201,6 @@
         }
     }
 
-    // 頁面初次載入時自動加載全庫藥品供即時比對與快速篩選
     window.addEventListener('DOMContentLoaded', () => {
         searchChemical();
     });

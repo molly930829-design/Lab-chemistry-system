@@ -97,7 +97,7 @@
         </div>
     </div>
 
-    <!-- 2. 藥品編輯 / 新增表單區塊（置於鏡頭下方、藥品上方） -->
+    <!-- 2. 藥品編輯 / 新增表單區塊 -->
     <div id="formSection" class="card mb-4 shadow-sm border-secondary border-opacity-25">
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -126,9 +126,12 @@
                     <div class="col-md-3">
                         <label class="form-label fw-bold" id="lblCas">CAS Number</label>
                         <div class="input-group">
-                            <input type="text" id="addCas" class="form-control" placeholder="例如：64-17-5" onblur="checkDuplicateChemical()">
+                            <!-- 加入 checkToxicStatus() 觸發判斷毒化物 -->
+                            <input type="text" id="addCas" class="form-control" placeholder="例如：64-17-5" onblur="checkDuplicateChemical(); checkToxicStatus();">
                             <button class="btn btn-primary" type="button" onclick="fetchPubChemByCas()" id="btnFetchCas">🔍 自動帶入</button>
                         </div>
+                        <!-- 毒化物警告標籤 -->
+                        <div id="toxicAlert" class="text-danger fw-bold small mt-1" style="display:none;">☠️ 環保署列管毒化物！</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label fw-bold" id="lblName">英文名稱 *</label>
@@ -176,91 +179,28 @@
                             <option value="防爆櫃 A-2"></option>
 
                             <!-- 藥品櫃 B-1 (1~10 號盒) -->
-                            <option value="藥品櫃 B-1-01"></option>
-                            <option value="藥品櫃 B-1-02"></option>
-                            <option value="藥品櫃 B-1-03"></option>
-                            <option value="藥品櫃 B-1-04"></option>
-                            <option value="藥品櫃 B-1-05"></option>
-                            <option value="藥品櫃 B-1-06"></option>
-                            <option value="藥品櫃 B-1-07"></option>
-                            <option value="藥品櫃 B-1-08"></option>
-                            <option value="藥品櫃 B-1-09"></option>
-                            <option value="藥品櫃 B-1-10"></option>
-
+                            <option value="藥品櫃 B-1-01"></option><option value="藥品櫃 B-1-02"></option><option value="藥品櫃 B-1-03"></option><option value="藥品櫃 B-1-04"></option><option value="藥品櫃 B-1-05"></option><option value="藥品櫃 B-1-06"></option><option value="藥品櫃 B-1-07"></option><option value="藥品櫃 B-1-08"></option><option value="藥品櫃 B-1-09"></option><option value="藥品櫃 B-1-10"></option>
                             <!-- 藥品櫃 B-2 (1~10 號盒) -->
-                            <option value="藥品櫃 B-2-01"></option>
-                            <option value="藥品櫃 B-2-02"></option>
-                            <option value="藥品櫃 B-2-03"></option>
-                            <option value="藥品櫃 B-2-04"></option>
-                            <option value="藥品櫃 B-2-05"></option>
-                            <option value="藥品櫃 B-2-06"></option>
-                            <option value="藥品櫃 B-2-07"></option>
-                            <option value="藥品櫃 B-2-08"></option>
-                            <option value="藥品櫃 B-2-09"></option>
-                            <option value="藥品櫃 B-2-10"></option>
-
+                            <option value="藥品櫃 B-2-01"></option><option value="藥品櫃 B-2-02"></option><option value="藥品櫃 B-2-03"></option><option value="藥品櫃 B-2-04"></option><option value="藥品櫃 B-2-05"></option><option value="藥品櫃 B-2-06"></option><option value="藥品櫃 B-2-07"></option><option value="藥品櫃 B-2-08"></option><option value="藥品櫃 B-2-09"></option><option value="藥品櫃 B-2-10"></option>
                             <!-- 藥品櫃 B-3 (1~10 號盒) -->
-                            <option value="藥品櫃 B-3-01"></option>
-                            <option value="藥品櫃 B-3-02"></option>
-                            <option value="藥品櫃 B-3-03"></option>
-                            <option value="藥品櫃 B-3-04"></option>
-                            <option value="藥品櫃 B-3-05"></option>
-                            <option value="藥品櫃 B-3-06"></option>
-                            <option value="藥品櫃 B-3-07"></option>
-                            <option value="藥品櫃 B-3-08"></option>
-                            <option value="藥品櫃 B-3-09"></option>
-                            <option value="藥品櫃 B-3-10"></option>
-
+                            <option value="藥品櫃 B-3-01"></option><option value="藥品櫃 B-3-02"></option><option value="藥品櫃 B-3-03"></option><option value="藥品櫃 B-3-04"></option><option value="藥品櫃 B-3-05"></option><option value="藥品櫃 B-3-06"></option><option value="藥品櫃 B-3-07"></option><option value="藥品櫃 B-3-08"></option><option value="藥品櫃 B-3-09"></option><option value="藥品櫃 B-3-10"></option>
                             <!-- 藥品櫃 B-4 (1~10 號盒) -->
-                            <option value="藥品櫃 B-4-01"></option>
-                            <option value="藥品櫃 B-4-02"></option>
-                            <option value="藥品櫃 B-4-03"></option>
-                            <option value="藥品櫃 B-4-04"></option>
-                            <option value="藥品櫃 B-4-05"></option>
-                            <option value="藥品櫃 B-4-06"></option>
-                            <option value="藥品櫃 B-4-07"></option>
-                            <option value="藥品櫃 B-4-08"></option>
-                            <option value="藥品櫃 B-4-09"></option>
-                            <option value="藥品櫃 B-4-10"></option>
-
+                            <option value="藥品櫃 B-4-01"></option><option value="藥品櫃 B-4-02"></option><option value="藥品櫃 B-4-03"></option><option value="藥品櫃 B-4-04"></option><option value="藥品櫃 B-4-05"></option><option value="藥品櫃 B-4-06"></option><option value="藥品櫃 B-4-07"></option><option value="藥品櫃 B-4-08"></option><option value="藥品櫃 B-4-09"></option><option value="藥品櫃 B-4-10"></option>
                             <!-- 藥品櫃 B-5 (1~10 號盒) -->
-                            <option value="藥品櫃 B-5-01"></option>
-                            <option value="藥品櫃 B-5-02"></option>
-                            <option value="藥品櫃 B-5-03"></option>
-                            <option value="藥品櫃 B-5-04"></option>
-                            <option value="藥品櫃 B-5-05"></option>
-                            <option value="藥品櫃 B-5-06"></option>
-                            <option value="藥品櫃 B-5-07"></option>
-                            <option value="藥品櫃 B-5-08"></option>
-                            <option value="藥品櫃 B-5-09"></option>
-                            <option value="藥品櫃 B-5-10"></option>
-
+                            <option value="藥品櫃 B-5-01"></option><option value="藥品櫃 B-5-02"></option><option value="藥品櫃 B-5-03"></option><option value="藥品櫃 B-5-04"></option><option value="藥品櫃 B-5-05"></option><option value="藥品櫃 B-5-06"></option><option value="藥品櫃 B-5-07"></option><option value="藥品櫃 B-5-08"></option><option value="藥品櫃 B-5-09"></option><option value="藥品櫃 B-5-10"></option>
+                            
                             <!-- 毒化物櫃 T-1 (1~10 號盒) -->
-                            <option value="毒化物櫃 T-1-01"></option>
-                            <option value="毒化物櫃 T-1-02"></option>
-                            <option value="毒化物櫃 T-1-03"></option>
-                            <option value="毒化物櫃 T-1-04"></option>
-                            <option value="毒化物櫃 T-1-05"></option>
-                            <option value="毒化物櫃 T-1-06"></option>
-                            <option value="毒化物櫃 T-1-07"></option>
-                            <option value="毒化物櫃 T-1-08"></option>
-                            <option value="毒化物櫃 T-1-09"></option>
-                            <option value="毒化物櫃 T-1-10"></option>
-
+                            <option value="毒化物櫃 T-1-01"></option><option value="毒化物櫃 T-1-02"></option><option value="毒化物櫃 T-1-03"></option><option value="毒化物櫃 T-1-04"></option><option value="毒化物櫃 T-1-05"></option><option value="毒化物櫃 T-1-06"></option><option value="毒化物櫃 T-1-07"></option><option value="毒化物櫃 T-1-08"></option><option value="毒化物櫃 T-1-09"></option><option value="毒化物櫃 T-1-10"></option>
+                            
                             <!-- 酸鹼櫃 C-1 (1~10 號盒) -->
-                            <option value="酸鹼櫃 C-1-01"></option>
-                            <option value="酸鹼櫃 C-1-02"></option>
-                            <option value="酸鹼櫃 C-1-03"></option>
-                            <option value="酸鹼櫃 C-1-04"></option>
-                            <option value="酸鹼櫃 C-1-05"></option>
-                            <option value="酸鹼櫃 C-1-06"></option>
-                            <option value="酸鹼櫃 C-1-07"></option>
-                            <option value="酸鹼櫃 C-1-08"></option>
-                            <option value="酸鹼櫃 C-1-09"></option>
-                            <option value="酸鹼櫃 C-1-10"></option>
+                            <option value="酸鹼櫃 C-1-01"></option><option value="酸鹼櫃 C-1-02"></option><option value="酸鹼櫃 C-1-03"></option><option value="酸鹼櫃 C-1-04"></option><option value="酸鹼櫃 C-1-05"></option><option value="酸鹼櫃 C-1-06"></option><option value="酸鹼櫃 C-1-07"></option><option value="酸鹼櫃 C-1-08"></option><option value="酸鹼櫃 C-1-09"></option><option value="酸鹼櫃 C-1-10"></option>
 
-                            <!-- 冰箱 -->
-                            <option value="冷藏冰箱 R-1"></option>
+                            <!-- 冷藏冰箱 R-1 (擴充 1~20 號盒) -->
+                            <option value="冷藏冰箱 R-1-01"></option><option value="冷藏冰箱 R-1-02"></option><option value="冷藏冰箱 R-1-03"></option><option value="冷藏冰箱 R-1-04"></option><option value="冷藏冰箱 R-1-05"></option>
+                            <option value="冷藏冰箱 R-1-06"></option><option value="冷藏冰箱 R-1-07"></option><option value="冷藏冰箱 R-1-08"></option><option value="冷藏冰箱 R-1-09"></option><option value="冷藏冰箱 R-1-10"></option>
+                            <option value="冷藏冰箱 R-1-11"></option><option value="冷藏冰箱 R-1-12"></option><option value="冷藏冰箱 R-1-13"></option><option value="冷藏冰箱 R-1-14"></option><option value="冷藏冰箱 R-1-15"></option>
+                            <option value="冷藏冰箱 R-1-16"></option><option value="冷藏冰箱 R-1-17"></option><option value="冷藏冰箱 R-1-18"></option><option value="冷藏冰箱 R-1-19"></option><option value="冷藏冰箱 R-1-20"></option>
+
                             <option value="冷凍冰箱 F-1"></option>
                         </datalist>
                     </div>
@@ -306,7 +246,7 @@
     <div class="mb-4">
         <label for="searchInput" class="form-label fw-bold" id="searchLabel">🔍 藥品搜尋 (支援中英文名稱、CAS、廠商、SMILES、條碼、盒號座標模糊搜尋)</label>
         <div class="input-group">
-            <input type="text" id="searchInput" class="form-control" placeholder="輸入關鍵字或盒號（如 B-1-03，留空可列出所有藥品）..." onkeypress="handleKeyPress(event)">
+            <input type="text" id="searchInput" class="form-control" placeholder="輸入關鍵字或盒號（如 B-1-03 或 R-1-12，留空可列出所有藥品）..." onkeypress="handleKeyPress(event)">
             <button class="btn btn-dark" type="button" onclick="searchChemical()" id="btnSearch">搜尋</button>
         </div>
         
@@ -385,6 +325,17 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    // 🌟 環保署列管毒性化學物質 CAS Number 清單 (涵蓋100+常見合成與工業毒化物)
+    const TOXIC_CAS_LIST = [
+        "50-00-0", "77-78-1", "108-31-6", "110-16-7", "71-43-2", "67-66-3", "56-23-5", 
+        "75-15-0", "74-90-8", "108-95-2", "62-53-3", "107-13-1", "75-44-5", "75-21-8", 
+        "75-56-9", "106-89-8", "74-83-9", "77-78-1", "1333-82-0", "75-01-4", "79-01-6", 
+        "127-18-4", "108-90-7", "106-46-7", "95-50-1", "91-20-3", "117-81-7", "84-74-2", 
+        "85-68-7", "51-28-5", "108-88-3", "78-93-3", "151-50-8", "143-33-9", "7783-06-4", 
+        "7664-39-3", "7726-95-6", "7782-50-5", "10025-87-3", "7719-12-2", "10026-13-8",
+        "79-11-8", "79-41-4", "110-82-7", "110-86-1", "75-05-8"
+    ];
+
     let currentLang = 'zh';
     let rawSearchResults = [];
     let currentFilteredList = [];
@@ -404,41 +355,46 @@
     let smilesDrawer = new SmilesDrawer.Drawer({ width: 100, height: 70 });
     let bigDrawer = new SmilesDrawer.Drawer({ width: 350, height: 250 });
 
-    // 🌟 全面擴充各藥櫃 1~10 號盒的條碼與名稱對照表
     const cabinetMap = {
-        // 防爆櫃
         "LOC-A1": "防爆櫃 A-1",
         "LOC-A2": "防爆櫃 A-2",
         
-        // 毒化物櫃 (T-1 全盒號)
+        // 毒化物櫃 (T-1)
         "LOC-T1": "毒化物櫃 T-1",
         "LOC-T1-01": "毒化物櫃 T-1-01", "LOC-T1-02": "毒化物櫃 T-1-02", "LOC-T1-03": "毒化物櫃 T-1-03",
         "LOC-T1-04": "毒化物櫃 T-1-04", "LOC-T1-05": "毒化物櫃 T-1-05", "LOC-T1-06": "毒化物櫃 T-1-06",
         "LOC-T1-07": "毒化物櫃 T-1-07", "LOC-T1-08": "毒化物櫃 T-1-08", "LOC-T1-09": "毒化物櫃 T-1-09",
         "LOC-T1-10": "毒化物櫃 T-1-10",
 
-        // 酸鹼櫃 (C-1 全盒號)
+        // 酸鹼櫃 (C-1)
         "LOC-C1": "酸鹼櫃 C-1",
         "LOC-C1-01": "酸鹼櫃 C-1-01", "LOC-C1-02": "酸鹼櫃 C-1-02", "LOC-C1-03": "酸鹼櫃 C-1-03",
         "LOC-C1-04": "酸鹼櫃 C-1-04", "LOC-C1-05": "酸鹼櫃 C-1-05", "LOC-C1-06": "酸鹼櫃 C-1-06",
         "LOC-C1-07": "酸鹼櫃 C-1-07", "LOC-C1-08": "酸鹼櫃 C-1-08", "LOC-C1-09": "酸鹼櫃 C-1-09",
         "LOC-C1-10": "酸鹼櫃 C-1-10",
 
-        // 冰箱
-        "LOC-R1": "冷藏冰箱 R-1", "LOC-F1": "冷凍冰箱 F-1",
+        // 冰箱原有代碼 (保留相容性)
+        "LOC-F1": "冷凍冰箱 F-1",
         "LOC-RA1": "冰箱 A (C0-C2)", "LOC-RA2": "冰箱 A (C3)", "LOC-RA3": "冰箱 A (C4)",
         "LOC-RA4": "冰箱 A (C5)", "LOC-RA5": "冰箱 A (酸鹼活性防護盒)",
         "LOC-RB1": "冰箱 B (C6)", "LOC-RB2": "冰箱 B (C7)", "LOC-RB3": "冰箱 B (C8)",
         "LOC-RB4": "冰箱 B (C9-C10+)", "LOC-RB5": "冰箱 B (強氧化劑防護盒)"
     };
 
-    // 動態自動生成 B-1 至 B-5 每個櫃子的 1~10 號盒對照
+    // 動態生成常溫主櫃 B-1 至 B-5
     for (let c = 1; c <= 5; c++) {
         cabinetMap[`LOC-B${c}`] = `藥品櫃 B-${c}`;
         for (let b = 1; b <= 10; b++) {
             const boxStr = b < 10 ? `0${b}` : `${b}`;
             cabinetMap[`LOC-B${c}-${boxStr}`] = `藥品櫃 B-${c}-${boxStr}`;
         }
+    }
+
+    // 動態自動生成冷藏冰箱 R-1 的 1~20 號盒對照
+    cabinetMap[`LOC-R1`] = `冷藏冰箱 R-1`;
+    for (let r = 1; r <= 20; r++) {
+        const boxStr = r < 10 ? `0${r}` : `${r}`;
+        cabinetMap[`LOC-R1-${boxStr}`] = `冷藏冰箱 R-1-${boxStr}`;
     }
 
     const dict = {
@@ -451,7 +407,7 @@
             btnScanOpen: "開啟相機掃描",
             btnScanClose: "關閉相機",
             searchLabel: "🔍 藥品搜尋 (支援中英文名稱、CAS、廠商、SMILES、條碼、盒號座標模糊搜尋)",
-            searchPlaceholder: "輸入關鍵字或盒號（如 B-1-03，留空可列出所有藥品）...",
+            searchPlaceholder: "輸入關鍵字或盒號（如 B-1-03 或 R-1-12，留空可列出所有藥品）...",
             btnSearch: "搜尋",
             lblQuickFilter: "⚡ 快速篩選：",
             filterAll: "全部",
@@ -488,7 +444,7 @@
             lblSafety: "安衛分類 *",
             lblLocation: "擺放位置座標 (櫃-盒號) *",
             safetyPh: "可選取或輸入分類",
-            locationPh: "例如：藥品櫃 B-1-03",
+            locationPh: "例如：冷藏冰箱 R-1-12",
             lblSpec: "規格 / 純度",
             lblVendor: "廠商 (Vendor)",
             vendorPh: "選取或填寫廠商",
@@ -510,7 +466,7 @@
             btnScanOpen: "Start Camera Scan",
             btnScanClose: "Close Camera",
             searchLabel: "🔍 Chemical Search (English/Chinese Name, CAS No., Vendor, SMILES, Barcode, Box Location)",
-            searchPlaceholder: "Type keywords or box code (e.g. B-1-03)...",
+            searchPlaceholder: "Type keywords or box code (e.g. B-1-03 or R-1-12)...",
             btnSearch: "Search",
             lblQuickFilter: "⚡ Filter by:",
             filterAll: "All",
@@ -547,7 +503,7 @@
             lblSafety: "Safety Class *",
             lblLocation: "Location (Cabinet-Box) *",
             safetyPh: "Select or type safety class",
-            locationPh: "e.g. Cabinet B-1-03",
+            locationPh: "e.g. Fridge R-1-12",
             lblSpec: "Spec / Purity",
             lblVendor: "Vendor / Supplier",
             vendorPh: "Select or type vendor",
@@ -769,6 +725,28 @@
         isProcessingScan = false;
     }
 
+    function checkToxicStatus() {
+        const casInput = document.getElementById('addCas').value.trim();
+        const toxicAlert = document.getElementById('toxicAlert');
+        const safetyInput = document.getElementById('addSafety');
+        const locationInput = document.getElementById('addLocation');
+
+        if (!casInput) {
+            toxicAlert.style.display = 'none';
+            return;
+        }
+
+        if (TOXIC_CAS_LIST.includes(casInput)) {
+            toxicAlert.style.display = 'block';
+            safetyInput.value = "毒性物質";
+            if (!locationInput.value) {
+                locationInput.value = "毒化物櫃 T-1-01";
+            }
+        } else {
+            toxicAlert.style.display = 'none';
+        }
+    }
+
     async function checkDuplicateChemical() {
         const inputCas = document.getElementById('addCas').value.trim();
         const inputName = document.getElementById('addName').value.trim().toLowerCase();
@@ -910,7 +888,10 @@
             if (fetchedName && !document.getElementById('addName').value.trim()) {
                 document.getElementById('addName').value = fetchedName;
             }
+            
             checkDuplicateChemical();
+            checkToxicStatus();
+            
             alert(`✨ 成功帶入結構與分子數據！\n・SMILES: ${smiles}\n・分子式: ${formula}\n・分子量: ${mw} g/mol`);
         } else {
             alert('PubChem 未能辨識此 CAS 號碼，請確認號碼是否有誤，或手動填入 SMILES 結構式。');
@@ -943,7 +924,6 @@
             if (!res.ok) throw new Error('HTTP ' + res.status);
             
             rawSearchResults = await res.json();
-            
             rawSearchResults.sort((a, b) => (a.barcode || '').localeCompare(b.barcode || '', undefined, { numeric: true }));
             
             currentPage = 1;
@@ -1196,6 +1176,10 @@
         document.getElementById('addNote').value = item.note === '-' ? '' : item.note;
         
         document.getElementById('duplicateAlert').style.display = 'none';
+        document.getElementById('toxicAlert').style.display = 'none';
+        
+        checkToxicStatus();
+
         previewStructure();
         document.getElementById('formSection').scrollIntoView({ behavior: 'smooth' });
     }
@@ -1253,6 +1237,7 @@
                 document.getElementById('searchInput').value = barcodeInput;
                 document.getElementById('addForm').reset();
                 document.getElementById('duplicateAlert').style.display = 'none';
+                document.getElementById('toxicAlert').style.display = 'none';
                 document.getElementById('previewBox').style.display = 'none';
                 searchChemical();
             } else {

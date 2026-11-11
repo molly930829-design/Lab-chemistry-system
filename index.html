@@ -324,139 +324,22 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     // 🌟 環境部「毒性化學物質列管名冊（第 1 至 4 類）」純毒化物 CAS 清單
-    // 已徹底移除關注化學物質（如 7722-84-1 雙氧水、笑氣、爆裂物前驅物、甲苯、丁酮等）
     const TOXIC_CAS_LIST = [
-        // 氯化有機溶劑與烷烴類
-        "67-66-3",   // 氯仿 (Chloroform)
-        "56-23-5",   // 四氯化碳 (Carbon tetrachloride)
-        "71-43-2",   // 苯 (Benzene)
-        "75-01-4",   // 氯乙烯 (Vinyl chloride)
-        "75-09-2",   // 二氯甲烷 (Dichloromethane)
-        "79-01-6",   // 三氯乙烯 (Trichloroethylene)
-        "127-18-4",  // 四氯乙烯 (Tetrachloroethylene)
-        "79-00-5",   // 1,1,2-三氯乙烷 (1,1,2-Trichloroethane)
-        "79-34-5",   // 1,1,2,2-四氯乙烷 (1,1,2,2-Tetrachloroethane)
-        "106-93-4",  // 1,2-二溴乙烷 (Ethylene dibromide)
-        "107-06-2",  // 1,2-二氯乙烷 (Ethylene dichloride)
-        "96-12-8",   // 1,2-二溴-3-氯丙烷 (DBCP)
-        "96-18-4",   // 1,2,3-三氯丙烷 (1,2,3-Trichloropropane)
-        "76-01-7",   // 五氯乙烷 (Pentachloroethane)
-        "67-72-1",   // 六氯乙烷 (Hexachloroethane)
-        "106-89-8",  // 環氧氯丙烷 (Epichlorohydrin)
-        "75-21-8",   // 環氧乙烷 (Ethylene oxide)
-        "75-56-9",   // 環氧丙烷 (Propylene oxide)
-
-        // 芳香烴、氯苯與酚胺衍生物
-        "95-50-1",   // 鄰二氯苯 (1,2-Dichlorobenzene)
-        "106-46-7",  // 對二氯苯 (1,4-Dichlorobenzene)
-        "120-82-1",  // 1,2,4-三氯苯 (1,2,4-Trichlorobenzene)
-        "118-74-1",  // 六氯苯 (Hexachlorobenzene)
-        "87-68-3",   // 六氯丁二烯 (Hexachlorobutadiene)
-        "92-87-5",   // 聯苯胺 (Benzidine)
-        "119-90-4",  // 3,3'-二甲氧基聯苯胺 (o-Dianisidine)
-        "119-93-7",  // 3,3'-二甲基聯苯胺 (o-Tolidine)
-        "91-94-1",   // 3,3'-二氯聯苯胺 (3,3'-Dichlorobenzidine)
-        "101-14-4",  // 4,4'-亞甲基雙(2-氯苯胺) (MOCA)
-        "101-77-9",  // 4,4'-二胺基二苯甲烷 (MDA)
-        "62-53-3",   // 苯胺 (Aniline)
-        "95-53-4",   // 鄰甲苯胺 (o-Toluidine)
-        "95-80-7",   // 2,4-二胺基甲苯 (2,4-Toluenediamine)
-        "584-84-9",  // 2,4-甲苯二異氰酸酯 (2,4-TDI)
-        "91-08-7",   // 2,6-甲苯二異氰酸酯 (2,6-TDI)
-        "108-95-2",  // 苯酚 (Phenol)
-        "87-86-5",   // 五氯酚 (Pentachlorophenol)
-        "88-06-2",   // 2,4,6-三氯酚 (2,4,6-Trichlorophenol)
-        "95-95-4",   // 2,4,5-三氯酚 (2,4,5-Trichlorophenol)
-        "120-83-2",  // 2,4-二氯酚 (2,4-Dichlorophenol)
-        "106-47-8",  // 對氯苯胺 (p-Chloroaniline)
-        "100-01-6",  // 對硝基苯胺 (p-Nitroaniline)
-        "98-95-3",   // 硝基苯 (Nitrobenzene)
-        "121-14-2",  // 2,4-二硝基甲苯 (2,4-DNT)
-        "606-20-2",  // 2,6-二硝基甲苯 (2,6-DNT)
-
-        // 烷基化試劑與強毒性反應物
-        "77-78-1",   // 硫酸二甲酯 (Dimethyl sulfate)
-        "64-67-5",   // 硫酸二乙酯 (Diethyl sulfate)
-        "50-00-0",   // 甲醛 (Formaldehyde)
-        "75-07-0",   // 乙醛 (Acetaldehyde)
-        "107-02-8",  // 丙烯醛 (Acrolein)
-        "107-13-1",  // 丙烯腈 (Acrylonitrile)
-        "79-06-1",   // 丙烯醯胺 (Acrylamide)
-        "55-18-5",   // N-亞硝基二乙胺 (DENA)
-        "62-75-9",   // N-亞硝基二甲胺 (DMNA)
-        "59-89-2",   // N-亞硝基嗎啉 (N-Nitrosomorpholine)
-        "542-88-1",  // 雙(氯甲基)醚 (BCME)
-        "107-30-2",  // 氯甲基甲基醚 (CMME)
-        "75-44-5",   // 光氣 (Phosgene)
-        "75-15-0",   // 二硫化碳 (Carbon disulfide)
-        "505-60-2",  // 芥子氣 (Mustard gas)
-
-        // 氰化物與無機劇毒金屬化物
-        "74-90-8",   // 氫氰酸 (Hydrogen cyanide)
-        "143-33-9",  // 氰化鈉 (Sodium cyanide)
-        "151-50-8",  // 氰化鉀 (Potassium cyanide)
-        "592-01-8",  // 氰化鈣 (Calcium cyanide)
-        "1333-82-0", // 三氧化鉻/鉻酸酐 (Chromium trioxide)
-        "7778-50-9", // 重鉻酸鉀 (Potassium dichromate)
-        "10588-01-9",// 重鉻酸鈉 (Sodium dichromate)
-        "7789-09-5", // 重鉻酸銨 (Ammonium dichromate)
-        "1309-64-4", // 三氧化二銻 (Antimony trioxide)
-        "1314-62-1", // 五氧化二釩 (Vanadium pentoxide)
-        "7440-38-2", // 砷及其化合物 (Arsenic)
-        "7440-43-9", // 鎘及其化合物 (Cadmium)
-        "7439-92-1", // 鉛及其化合物 (Lead)
-        "7439-97-6", // 汞及其化合物 (Mercury)
-        "7440-02-0", // 鎳及其化合物 (Nickel)
-        "7440-41-7", // 鈹及其化合物 (Beryllium)
-        "13463-39-3",// 四羰基鎳 (Nickel carbonyl)
-        "78-00-2",   // 四乙基鉛 (Tetraethyl lead)
-        "1332-21-4", // 石綿 (Asbestos)
-
-        // 塑化劑 (鄰苯二甲酸酯類列管項)
-        "117-81-7",  // DEHP
-        "84-74-2",   // DBP
-        "85-68-7",   // BBP
-        "131-18-0",  // DPP
-        "117-84-0",  // DNOP
-        "28553-12-0",// DINP
-        "26761-40-0",// DIDP
-        "84-75-3",   // DnHP
-        "84-69-5",   // DIBP
-
-        // 多環芳香烴 (PAHs)
-        "50-32-8",   // 苯駢[a]芘 (Benzo[a]pyrene)
-        "56-55-3",   // 苯駢[a]蒽 (Benzo[a]anthracene)
-        "205-99-2",  // 苯駢[b]螢蒽 (Benzo[b]fluoranthene)
-        "207-08-9",  // 苯駢[k]螢蒽 (Benzo[k]fluoranthene)
-        "218-01-9",  // 䓛 (Chrysene)
-        "53-70-3",   // 二苯駢[a,h]蒽 (Dibenz[a,h]anthracene)
-        "193-39-5",  // 茚駢[1,2,3-cd]芘 (Indeno[1,2,3-cd]pyrene)
-
-        // 多氯聯苯與戴奧辛類
-        "1336-36-3", // 多氯聯苯 (PCBs)
-        "1746-01-6", // 2,3,7,8-TCDD (Dioxin)
-        "3268-87-9", // 1,2,3,4,6,7,8,9-OCDD
-
-        // 列管農藥、有機錫與持久性有機污染物 (POPs)
-        "50-29-3",   // DDT
-        "60-57-1",   // 狄氏劑 (Dieldrin)
-        "72-20-8",   // 異狄氏劑 (Endrin)
-        "309-00-2",  // 艾氏劑 (Aldrin)
-        "76-44-8",   // 飛布達 (Heptachlor)
-        "57-74-9",   // 氯丹 (Chlordane)
-        "8001-35-2", // 毒殺芬 (Toxaphene)
-        "2385-85-5", // 滅蟻樂 (Mirex)
-        "143-50-0",  // 錢得興 (Chlordecone)
-        "58-89-9",   // 靈丹 (Lindane)
-        "115-29-7",  // 安殺番 (Endosulfan)
-        "56-38-2",   // 巴拉松 (Parathion)
-        "298-00-0",  // 甲基巴拉松 (Methyl parathion)
-        "116-06-3",  // 涕滅威 (Aldicarb)
-        "54-11-5",   // 菸鹼/尼古丁 (Nicotine - 工業農用純品)
-        "56-35-9",   // 三丁基氧化錫 (TBTO)
-        "1461-22-9", // 三丁基氯化錫 (TBTC)
-        "1163-19-5", // 十溴二苯醚 (DecaBDE)
-        "25637-99-4" // 六溴環十二烷 (HBCD)
+        "67-66-3", "56-23-5", "71-43-2", "75-01-4", "75-09-2", "79-01-6", "127-18-4", "79-00-5", 
+        "79-34-5", "106-93-4", "107-06-2", "96-12-8", "96-18-4", "76-01-7", "67-72-1", "106-89-8", 
+        "75-21-8", "75-56-9", "95-50-1", "106-46-7", "120-82-1", "118-74-1", "87-68-3", "92-87-5", 
+        "119-90-4", "119-93-7", "91-94-1", "101-14-4", "101-77-9", "62-53-3", "95-53-4", "95-80-7", 
+        "584-84-9", "91-08-7", "108-95-2", "87-86-5", "88-06-2", "95-95-4", "120-83-2", "106-47-8", 
+        "100-01-6", "98-95-3", "121-14-2", "606-20-2", "77-78-1", "64-67-5", "50-00-0", "75-07-0", 
+        "107-02-8", "107-13-1", "79-06-1", "55-18-5", "62-75-9", "59-89-2", "542-88-1", "107-30-2", 
+        "75-44-5", "75-15-0", "505-60-2", "74-90-8", "143-33-9", "151-50-8", "592-01-8", "1333-82-0", 
+        "7778-50-9", "10588-01-9", "7789-09-5", "1309-64-4", "1314-62-1", "7440-38-2", "7440-43-9", 
+        "7439-92-1", "7439-97-6", "7440-02-0", "7440-41-7", "13463-39-3", "78-00-2", "1332-21-4", 
+        "117-81-7", "84-74-2", "85-68-7", "131-18-0", "117-84-0", "28553-12-0", "26761-40-0", "84-75-3", 
+        "84-69-5", "50-32-8", "56-55-3", "205-99-2", "207-08-9", "218-01-9", "53-70-3", "193-39-5", 
+        "1336-36-3", "1746-01-6", "3268-87-9", "50-29-3", "60-57-1", "72-20-8", "309-00-2", "76-44-8", 
+        "57-74-9", "8001-35-2", "2385-85-5", "143-50-0", "58-89-9", "115-29-7", "56-38-2", "298-00-0", 
+        "116-06-3", "54-11-5", "56-35-9", "1461-22-9", "1163-19-5", "25637-99-4"
     ];
 
     let currentLang = 'zh';
@@ -518,6 +401,31 @@
     for (let r = 1; r <= 20; r++) {
         const boxStr = r < 10 ? `0${r}` : `${r}`;
         cabinetMap[`LOC-R1-${boxStr}`] = `冷藏冰箱 R-1-${boxStr}`;
+    }
+
+    // 🌟 根據櫃位屬性回傳對應的 Bootstrap 顏色 Badge Class
+    function getLocationBadgeClass(location) {
+        if (!location || location === '-') return 'bg-secondary';
+        const loc = location.toUpperCase();
+
+        // 1. 毒化物櫃 -> 紅色 (Danger)
+        if (loc.includes('毒') || loc.includes('T-1') || loc.includes('T1')) {
+            return 'bg-danger text-white';
+        }
+        // 2. 酸鹼櫃 / 防爆櫃 -> 橘黃色警告 (Warning)
+        if (loc.includes('酸') || loc.includes('鹼') || loc.includes('防爆') || loc.includes('C-1') || loc.includes('A-1') || loc.includes('A-2')) {
+            return 'bg-warning text-dark';
+        }
+        // 3. -20°C 冷凍冰箱 -> 深藍色 (Primary)
+        if (loc.includes('冷凍') || loc.includes('F-1') || loc.includes('F1')) {
+            return 'bg-primary text-white';
+        }
+        // 4. 4°C 冷藏冰箱 -> 青水藍 (Info)
+        if (loc.includes('冷藏') || loc.includes('R-1') || loc.includes('R1') || loc.includes('冰箱')) {
+            return 'bg-info text-dark';
+        }
+        // 5. 常溫藥品櫃 (B-1 至 B-5) 及其他常溫架位 -> 中性灰 (Secondary)
+        return 'bg-secondary text-white';
     }
 
     const dict = {
@@ -848,7 +756,6 @@
         isProcessingScan = false;
     }
 
-    // 🌟 純毒性化學物質即時檢查
     function checkToxicStatus() {
         const casInput = document.getElementById('addCas').value.trim();
         const toxicAlert = document.getElementById('toxicAlert');
@@ -910,11 +817,12 @@
             
             duplicates.forEach(d => {
                 const vendorSpec = `${d.spec || '-'} / ${d.vendor || '-'}`;
+                const badgeClass = getLocationBadgeClass(d.location);
                 html += `
                     <tr>
                         <td><code>${d.barcode}</code></td>
                         <td><b>${d.name}</b> <small class="text-primary">${d.chinese_name !== '-' ? d.chinese_name : ''}</small></td>
-                        <td><span class="badge bg-danger fs-6">${d.location}</span></td>
+                        <td><span class="badge ${badgeClass} fs-6">${d.location}</span></td>
                         <td>${vendorSpec}</td>
                         <td><small class="text-muted">${d.note || '-'}</small></td>
                     </tr>
@@ -1150,6 +1058,9 @@
                 </td>
             `;
 
+            // 🌟 依照櫃位屬性動態取得 Badge 顏色
+            const locationBadgeClass = getLocationBadgeClass(item.location);
+
             tr.innerHTML = `
                 <td><code>${item.barcode}</code></td>
                 <td>${nameDisplay}</td>
@@ -1157,7 +1068,7 @@
                 <td>${formulaMw}</td>
                 <td class="text-center">${structHtml}</td>
                 <td><span class="badge bg-warning text-dark">${item.safety_class}</span></td>
-                <td><span class="badge bg-info text-dark fw-bold">${item.location}</span></td>
+                <td><span class="badge ${locationBadgeClass} fw-bold">${item.location}</span></td>
                 <td>${item.spec}</td>
                 <td><span class="badge bg-light text-dark border">${item.vendor}</span></td>
                 <td>${item.note}</td>

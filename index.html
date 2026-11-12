@@ -172,6 +172,11 @@
                         <label class="form-label fw-bold text-primary" id="lblLocation">擺放位置座標 (櫃-盒號) *</label>
                         <input type="text" id="addLocation" list="locationOptions" class="form-control border-primary" placeholder="例如：藥品櫃 B-1-03" required>
                         <datalist id="locationOptions">
+                            <!-- 乾燥櫃 D-1 ~ D-3 -->
+                            <option value="乾燥櫃 D-1"></option>
+                            <option value="乾燥櫃 D-2"></option>
+                            <option value="乾燥櫃 D-3"></option>
+
                             <!-- 防爆櫃 -->
                             <option value="防爆櫃 A-1"></option>
                             <option value="防爆櫃 A-2"></option>
@@ -244,7 +249,7 @@
     <div class="mb-4">
         <label for="searchInput" class="form-label fw-bold" id="searchLabel">🔍 藥品搜尋 (支援中英文名稱、CAS、廠商、SMILES、條碼、盒號座標模糊搜尋)</label>
         <div class="input-group">
-            <input type="text" id="searchInput" class="form-control" placeholder="輸入關鍵字或盒號（如 B-1-03 或 R-1-12，留空可列出所有藥品）..." onkeypress="handleKeyPress(event)">
+            <input type="text" id="searchInput" class="form-control" placeholder="輸入關鍵字或盒號（如 B-1-03、R-1-12 或 D-1，留空可列出所有藥品）..." onkeypress="handleKeyPress(event)">
             <button class="btn btn-dark" type="button" onclick="searchChemical()" id="btnSearch">搜尋</button>
         </div>
         
@@ -255,6 +260,7 @@
             <button type="button" class="filter-chip" data-filter="fridge" onclick="setFilter('fridge', this)">❄️ 冷藏 4°C</button>
             <button type="button" class="filter-chip" data-filter="freezer" onclick="setFilter('freezer', this)">🧊 冷凍 -20°C</button>
             <button type="button" class="filter-chip" data-filter="cabinet" onclick="setFilter('cabinet', this)">🚪 常溫主櫃 (B1-B5 盒)</button>
+            <button type="button" class="filter-chip" data-filter="dry" onclick="setFilter('dry', this)">🏜️ 乾燥櫃 (D1-D3)</button>
             <button type="button" class="filter-chip" data-filter="toxic" onclick="setFilter('toxic', this)">☠️ 毒化物櫃 (T1 盒)</button>
             <button type="button" class="filter-chip" data-filter="hazard" onclick="setFilter('hazard', this)">⚠️ 特殊危險 (酸鹼/氧化/禁水)</button>
         </div>
@@ -362,6 +368,12 @@
     let bigDrawer = new SmilesDrawer.Drawer({ width: 350, height: 250 });
 
     const cabinetMap = {
+        // 乾燥櫃 D-1 ~ D-3
+        "LOC-D1": "乾燥櫃 D-1",
+        "LOC-D2": "乾燥櫃 D-2",
+        "LOC-D3": "乾燥櫃 D-3",
+
+        // 防爆櫃
         "LOC-A1": "防爆櫃 A-1",
         "LOC-A2": "防爆櫃 A-2",
         
@@ -412,19 +424,23 @@
         if (loc.includes('毒') || loc.includes('T-1') || loc.includes('T1')) {
             return 'bg-danger text-white';
         }
-        // 2. 酸鹼櫃 / 防爆櫃 -> 橘黃色警告 (Warning)
+        // 2. 乾燥櫃 -> 翠綠色 (Success)
+        if (loc.includes('乾燥') || loc.includes('D-1') || loc.includes('D-2') || loc.includes('D-3')) {
+            return 'bg-success text-white';
+        }
+        // 3. 酸鹼櫃 / 防爆櫃 -> 橘黃色警告 (Warning)
         if (loc.includes('酸') || loc.includes('鹼') || loc.includes('防爆') || loc.includes('C-1') || loc.includes('A-1') || loc.includes('A-2')) {
             return 'bg-warning text-dark';
         }
-        // 3. -20°C 冷凍冰箱 -> 深藍色 (Primary)
+        // 4. -20°C 冷凍冰箱 -> 深藍色 (Primary)
         if (loc.includes('冷凍') || loc.includes('F-1') || loc.includes('F1')) {
             return 'bg-primary text-white';
         }
-        // 4. 4°C 冷藏冰箱 -> 青水藍 (Info)
+        // 5. 4°C 冷藏冰箱 -> 青水藍 (Info)
         if (loc.includes('冷藏') || loc.includes('R-1') || loc.includes('R1') || loc.includes('冰箱')) {
             return 'bg-info text-dark';
         }
-        // 5. 常溫藥品櫃 (B-1 至 B-5) 及其他常溫架位 -> 中性灰 (Secondary)
+        // 6. 常溫藥品櫃 (B-1 至 B-5) 及其他常溫架位 -> 中性灰 (Secondary)
         return 'bg-secondary text-white';
     }
 
@@ -438,13 +454,14 @@
             btnScanOpen: "開啟相機掃描",
             btnScanClose: "關閉相機",
             searchLabel: "🔍 藥品搜尋 (支援中英文名稱、CAS、廠商、SMILES、條碼、盒號座標模糊搜尋)",
-            searchPlaceholder: "輸入關鍵字或盒號（如 B-1-03 或 R-1-12，留空可列出所有藥品）...",
+            searchPlaceholder: "輸入關鍵字或盒號（如 B-1-03、R-1-12 或 D-1，留空可列出所有藥品）...",
             btnSearch: "搜尋",
             lblQuickFilter: "⚡ 快速篩選：",
             filterAll: "全部",
             filterFridge: "❄️ 冷藏 4°C",
             filterFreezer: "🧊 冷凍 -20°C",
             filterCabinet: "🚪 常溫主櫃 (B1-B5 盒)",
+            filterDry: "🏜️ 乾燥櫃 (D1-D3)",
             filterToxic: "☠️ 毒化物櫃 (T1 盒)",
             filterHazard: "⚠️ 特殊危險 (酸鹼/氧化/禁水)",
             resultHeader: "查詢結果",
@@ -475,7 +492,7 @@
             lblSafety: "安衛分類 *",
             lblLocation: "擺放位置座標 (櫃-盒號) *",
             safetyPh: "可選取或輸入分類",
-            locationPh: "例如：冷藏冰箱 R-1-12",
+            locationPh: "例如：乾燥櫃 D-1 或 B-1-03",
             lblSpec: "規格 / 純度",
             lblVendor: "廠商 (Vendor)",
             vendorPh: "選取或填寫廠商",
@@ -497,13 +514,14 @@
             btnScanOpen: "Start Camera Scan",
             btnScanClose: "Close Camera",
             searchLabel: "🔍 Chemical Search (English/Chinese Name, CAS No., Vendor, SMILES, Barcode, Box Location)",
-            searchPlaceholder: "Type keywords or box code (e.g. B-1-03 or R-1-12)...",
+            searchPlaceholder: "Type keywords or box code (e.g. B-1-03, R-1-12 or D-1)...",
             btnSearch: "Search",
             lblQuickFilter: "⚡ Filter by:",
             filterAll: "All",
             filterFridge: "❄️ Fridge 4°C",
             filterFreezer: "🧊 Freezer -20°C",
             filterCabinet: "🚪 Cabinet (B1-B5 Boxes)",
+            filterDry: "🏜️ Dry Cabinet (D1-D3)",
             filterToxic: "☠️ Toxic Cabinet (T1 Boxes)",
             filterHazard: "⚠️ Hazardous (Acid/Base/Ox/Reactive)",
             resultHeader: "Search Results",
@@ -534,7 +552,7 @@
             lblSafety: "Safety Class *",
             lblLocation: "Location (Cabinet-Box) *",
             safetyPh: "Select or type safety class",
-            locationPh: "e.g. Fridge R-1-12",
+            locationPh: "e.g. Dry Cabinet D-1 or B-1-03",
             lblSpec: "Spec / Purity",
             lblVendor: "Vendor / Supplier",
             vendorPh: "Select or type vendor",
@@ -636,6 +654,7 @@
             else if (f === 'fridge') chip.innerText = t.filterFridge;
             else if (f === 'freezer') chip.innerText = t.filterFreezer;
             else if (f === 'cabinet') chip.innerText = t.filterCabinet;
+            else if (f === 'dry') chip.innerText = t.filterDry;
             else if (f === 'toxic') chip.innerText = t.filterToxic;
             else if (f === 'hazard') chip.innerText = t.filterHazard;
         });
@@ -989,6 +1008,11 @@
                 const loc = (item.location || '').toLowerCase();
                 return loc.includes('藥品櫃') || loc.includes('b-') || loc.includes('架') || loc.includes('箱') || loc.includes('盒');
             });
+        } else if (currentFilter === 'dry') {
+            currentFilteredList = rawSearchResults.filter(item => {
+                const loc = (item.location || '').toLowerCase();
+                return loc.includes('乾燥') || loc.includes('d-1') || loc.includes('d-2') || loc.includes('d-3');
+            });
         } else if (currentFilter === 'toxic') {
             currentFilteredList = rawSearchResults.filter(item => {
                 const safe = (item.safety_class || '').toLowerCase();
@@ -1058,7 +1082,6 @@
                 </td>
             `;
 
-            // 🌟 依照櫃位屬性動態取得 Badge 顏色
             const locationBadgeClass = getLocationBadgeClass(item.location);
 
             tr.innerHTML = `

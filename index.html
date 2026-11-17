@@ -126,7 +126,7 @@
                     <div class="col-md-3">
                         <label class="form-label fw-bold" id="lblCas">CAS Number</label>
                         <div class="input-group">
-                            <input type="text" id="addCas" class="form-control" placeholder="例如：64-17-5" onblur="checkDuplicateChemical(); checkToxicStatus();">
+                            <input type="text" id="addCas" class="form-control" placeholder="例如：64-17-5" oninput="checkToxicStatus()" onblur="checkDuplicateChemical(); checkToxicStatus();">
                             <button class="btn btn-primary" type="button" onclick="fetchPubChemByCas()" id="btnFetchCas">🔍 自動帶入</button>
                         </div>
                         <div id="toxicAlert" class="text-danger fw-bold small mt-1" style="display:none;">☠️ 環保署列管毒性化學物質！</div>
@@ -169,8 +169,8 @@
                         </datalist>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label fw-bold text-primary" id="lblLocation">擺放位置座標 (櫃-盒號) *</label>
-                        <input type="text" id="addLocation" list="locationOptions" class="form-control border-primary" placeholder="例如：藥品櫃 B-1-03" required>
+                        <label class="form-label fw-bold text-primary" id="lblLocation">擺放位置座標 (櫃/層-盒號) *</label>
+                        <input type="text" id="addLocation" list="locationOptions" class="form-control border-primary" placeholder="例如：冷藏冰箱 R-2-04" required>
                         <datalist id="locationOptions">
                             <!-- 乾燥櫃 D-1 ~ D-3 -->
                             <option value="乾燥櫃 D-1"></option>
@@ -198,11 +198,12 @@
                             <!-- 酸鹼櫃 C-1 (1~10 號盒) -->
                             <option value="酸鹼櫃 C-1-01"></option><option value="酸鹼櫃 C-1-02"></option><option value="酸鹼櫃 C-1-03"></option><option value="酸鹼櫃 C-1-04"></option><option value="酸鹼櫃 C-1-05"></option><option value="酸鹼櫃 C-1-06"></option><option value="酸鹼櫃 C-1-07"></option><option value="酸鹼櫃 C-1-08"></option><option value="酸鹼櫃 C-1-09"></option><option value="酸鹼櫃 C-1-10"></option>
 
-                            <!-- 冷藏冰箱 R-1 (擴充 1~20 號盒) -->
-                            <option value="冷藏冰箱 R-1-01"></option><option value="冷藏冰箱 R-1-02"></option><option value="冷藏冰箱 R-1-03"></option><option value="冷藏冰箱 R-1-04"></option><option value="冷藏冰箱 R-1-05"></option>
-                            <option value="冷藏冰箱 R-1-06"></option><option value="冷藏冰箱 R-1-07"></option><option value="冷藏冰箱 R-1-08"></option><option value="冷藏冰箱 R-1-09"></option><option value="冷藏冰箱 R-1-10"></option>
-                            <option value="冷藏冰箱 R-1-11"></option><option value="冷藏冰箱 R-1-12"></option><option value="冷藏冰箱 R-1-13"></option><option value="冷藏冰箱 R-1-14"></option><option value="冷藏冰箱 R-1-15"></option>
-                            <option value="冷藏冰箱 R-1-16"></option><option value="冷藏冰箱 R-1-17"></option><option value="冷藏冰箱 R-1-18"></option><option value="冷藏冰箱 R-1-19"></option><option value="冷藏冰箱 R-1-20"></option>
+                            <!-- 冷藏冰箱 5 層 × 6 盒 (R-1-01 ~ R-5-06) -->
+                            <option value="冷藏冰箱 R-1-01"></option><option value="冷藏冰箱 R-1-02"></option><option value="冷藏冰箱 R-1-03"></option><option value="冷藏冰箱 R-1-04"></option><option value="冷藏冰箱 R-1-05"></option><option value="冷藏冰箱 R-1-06"></option>
+                            <option value="冷藏冰箱 R-2-01"></option><option value="冷藏冰箱 R-2-02"></option><option value="冷藏冰箱 R-2-03"></option><option value="冷藏冰箱 R-2-04"></option><option value="冷藏冰箱 R-2-05"></option><option value="冷藏冰箱 R-2-06"></option>
+                            <option value="冷藏冰箱 R-3-01"></option><option value="冷藏冰箱 R-3-02"></option><option value="冷藏冰箱 R-3-03"></option><option value="冷藏冰箱 R-3-04"></option><option value="冷藏冰箱 R-3-05"></option><option value="冷藏冰箱 R-3-06"></option>
+                            <option value="冷藏冰箱 R-4-01"></option><option value="冷藏冰箱 R-4-02"></option><option value="冷藏冰箱 R-4-03"></option><option value="冷藏冰箱 R-4-04"></option><option value="冷藏冰箱 R-4-05"></option><option value="冷藏冰箱 R-4-06"></option>
+                            <option value="冷藏冰箱 R-5-01"></option><option value="冷藏冰箱 R-5-02"></option><option value="冷藏冰箱 R-5-03"></option><option value="冷藏冰箱 R-5-04"></option><option value="冷藏冰箱 R-5-05"></option><option value="冷藏冰箱 R-5-06"></option>
 
                             <option value="冷凍冰箱 F-1"></option>
                         </datalist>
@@ -249,7 +250,7 @@
     <div class="mb-4">
         <label for="searchInput" class="form-label fw-bold" id="searchLabel">🔍 藥品搜尋 (支援中英文名稱、CAS、廠商、SMILES、條碼、盒號座標模糊搜尋)</label>
         <div class="input-group">
-            <input type="text" id="searchInput" class="form-control" placeholder="輸入關鍵字或盒號（如 B-1-03、R-1-12 或 D-1，留空可列出所有藥品）..." onkeypress="handleKeyPress(event)">
+            <input type="text" id="searchInput" class="form-control" placeholder="輸入關鍵字或盒號（如 B-1-03、R-2-04 或 D-1，留空可列出所有藥品）..." onkeypress="handleKeyPress(event)">
             <button class="btn btn-dark" type="button" onclick="searchChemical()" id="btnSearch">搜尋</button>
         </div>
         
@@ -257,7 +258,7 @@
         <div class="filter-chip-group" id="filterChipsContainer">
             <span class="text-muted small align-self-center me-1" id="lblQuickFilter">⚡ 快速篩選：</span>
             <button type="button" class="filter-chip active" data-filter="all" onclick="setFilter('all', this)">全部</button>
-            <button type="button" class="filter-chip" data-filter="fridge" onclick="setFilter('fridge', this)">❄️ 冷藏 4°C</button>
+            <button type="button" class="filter-chip" data-filter="fridge" onclick="setFilter('fridge', this)">❄️ 冷藏 4°C (R1-R5層)</button>
             <button type="button" class="filter-chip" data-filter="freezer" onclick="setFilter('freezer', this)">🧊 冷凍 -20°C</button>
             <button type="button" class="filter-chip" data-filter="cabinet" onclick="setFilter('cabinet', this)">🚪 常溫主櫃 (B1-B5 盒)</button>
             <button type="button" class="filter-chip" data-filter="dry" onclick="setFilter('dry', this)">🏜️ 乾燥櫃 (D1-D3)</button>
@@ -281,7 +282,7 @@
                     <th id="thFormula">分子式/分子量</th>
                     <th id="thStructure">2D 化學結構</th>
                     <th id="thSafety">安衛分類</th>
-                    <th id="thLocation">位置座標 (櫃-盒號)</th>
+                    <th id="thLocation">位置座標 (櫃/層-盒號)</th>
                     <th id="thSpec">規格</th>
                     <th id="thVendor">廠商</th>
                     <th id="thNote">備註</th>
@@ -330,22 +331,139 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     // 🌟 環境部「毒性化學物質列管名冊（第 1 至 4 類）」純毒化物 CAS 清單
+    // 已徹底排除關注化學物質（如雙氧水 7722-84-1、笑氣、爆裂物前驅物、甲苯、丁酮）
     const TOXIC_CAS_LIST = [
-        "67-66-3", "56-23-5", "71-43-2", "75-01-4", "75-09-2", "79-01-6", "127-18-4", "79-00-5", 
-        "79-34-5", "106-93-4", "107-06-2", "96-12-8", "96-18-4", "76-01-7", "67-72-1", "106-89-8", 
-        "75-21-8", "75-56-9", "95-50-1", "106-46-7", "120-82-1", "118-74-1", "87-68-3", "92-87-5", 
-        "119-90-4", "119-93-7", "91-94-1", "101-14-4", "101-77-9", "62-53-3", "95-53-4", "95-80-7", 
-        "584-84-9", "91-08-7", "108-95-2", "87-86-5", "88-06-2", "95-95-4", "120-83-2", "106-47-8", 
-        "100-01-6", "98-95-3", "121-14-2", "606-20-2", "77-78-1", "64-67-5", "50-00-0", "75-07-0", 
-        "107-02-8", "107-13-1", "79-06-1", "55-18-5", "62-75-9", "59-89-2", "542-88-1", "107-30-2", 
-        "75-44-5", "75-15-0", "505-60-2", "74-90-8", "143-33-9", "151-50-8", "592-01-8", "1333-82-0", 
-        "7778-50-9", "10588-01-9", "7789-09-5", "1309-64-4", "1314-62-1", "7440-38-2", "7440-43-9", 
-        "7439-92-1", "7439-97-6", "7440-02-0", "7440-41-7", "13463-39-3", "78-00-2", "1332-21-4", 
-        "117-81-7", "84-74-2", "85-68-7", "131-18-0", "117-84-0", "28553-12-0", "26761-40-0", "84-75-3", 
-        "84-69-5", "50-32-8", "56-55-3", "205-99-2", "207-08-9", "218-01-9", "53-70-3", "193-39-5", 
-        "1336-36-3", "1746-01-6", "3268-87-9", "50-29-3", "60-57-1", "72-20-8", "309-00-2", "76-44-8", 
-        "57-74-9", "8001-35-2", "2385-85-5", "143-50-0", "58-89-9", "115-29-7", "56-38-2", "298-00-0", 
-        "116-06-3", "54-11-5", "56-35-9", "1461-22-9", "1163-19-5", "25637-99-4"
+        // 氯化有機溶劑與烷烴類
+        "67-66-3",   // 氯仿 (Chloroform)
+        "56-23-5",   // 四氯化碳 (Carbon tetrachloride)
+        "71-43-2",   // 苯 (Benzene)
+        "75-01-4",   // 氯乙烯 (Vinyl chloride)
+        "75-09-2",   // 二氯甲烷 (Dichloromethane)
+        "79-01-6",   // 三氯乙烯 (Trichloroethylene)
+        "127-18-4",  // 四氯乙烯 (Tetrachloroethylene)
+        "79-00-5",   // 1,1,2-三氯乙烷 (1,1,2-Trichloroethane)
+        "79-34-5",   // 1,1,2,2-四氯乙烷 (1,1,2,2-Tetrachloroethane)
+        "106-93-4",  // 1,2-二溴乙烷 (Ethylene dibromide)
+        "107-06-2",  // 1,2-二氯乙烷 (Ethylene dichloride)
+        "96-12-8",   // 1,2-二溴-3-氯丙烷 (DBCP)
+        "96-18-4",   // 1,2,3-三氯丙烷 (1,2,3-Trichloropropane)
+        "76-01-7",   // 五氯乙烷 (Pentachloroethane)
+        "67-72-1",   // 六氯乙烷 (Hexachloroethane)
+        "106-89-8",  // 環氧氯丙烷 (Epichlorohydrin)
+        "75-21-8",   // 環氧乙烷 (Ethylene oxide)
+        "75-56-9",   // 環氧丙烷 (Propylene oxide)
+
+        // 芳香烴、氯苯與酚胺衍生物
+        "95-50-1",   // 鄰二氯苯 (1,2-Dichlorobenzene)
+        "106-46-7",  // 對二氯苯 (1,4-Dichlorobenzene)
+        "120-82-1",  // 1,2,4-三氯苯 (1,2,4-Trichlorobenzene)
+        "118-74-1",  // 六氯苯 (Hexachlorobenzene)
+        "87-68-3",   // 六氯丁二烯 (Hexachlorobutadiene)
+        "92-87-5",   // 聯苯胺 (Benzidine)
+        "119-90-4",  // 3,3'-二甲氧基聯苯胺 (o-Dianisidine)
+        "119-93-7",  // 3,3'-二甲基聯苯胺 (o-Tolidine)
+        "91-94-1",   // 3,3'-二氯聯苯胺 (3,3'-Dichlorobenzidine)
+        "101-14-4",  // 4,4'-亞甲基雙(2-氯苯胺) (MOCA)
+        "101-77-9",  // 4,4'-二胺基二苯甲烷 (MDA)
+        "62-53-3",   // 苯胺 (Aniline)
+        "95-53-4",   // 鄰甲苯胺 (o-Toluidine)
+        "95-80-7",   // 2,4-二胺基甲苯 (2,4-Toluenediamine)
+        "584-84-9",  // 2,4-甲苯二異氰酸酯 (2,4-TDI)
+        "91-08-7",   // 2,6-甲苯二異氰酸酯 (2,6-TDI)
+        "108-95-2",  // 苯酚 (Phenol)
+        "87-86-5",   // 五氯酚 (Pentachlorophenol)
+        "88-06-2",   // 2,4,6-三氯酚 (2,4,6-Trichlorophenol)
+        "95-95-4",   // 2,4,5-三氯酚 (2,4,5-Trichlorophenol)
+        "120-83-2",  // 2,4-二氯酚 (2,4-Dichlorophenol)
+        "106-47-8",  // 對氯苯胺 (p-Chloroaniline)
+        "100-01-6",  // 對硝基苯胺 (p-Nitroaniline)
+        "98-95-3",   // 硝基苯 (Nitrobenzene)
+        "121-14-2",  // 2,4-二硝基甲苯 (2,4-DNT)
+        "606-20-2",  // 2,6-二硝基甲苯 (2,6-DNT)
+
+        // 烷基化試劑與強毒性反應物
+        "77-78-1",   // 硫酸二甲酯 (Dimethyl sulfate)
+        "64-67-5",   // 硫酸二乙酯 (Diethyl sulfate)
+        "50-00-0",   // 甲醛 (Formaldehyde)
+        "75-07-0",   // 乙醛 (Acetaldehyde)
+        "107-02-8",  // 丙烯醛 (Acrolein)
+        "107-13-1",  // 丙烯腈 (Acrylonitrile)
+        "79-06-1",   // 丙烯醯胺 (Acrylamide)
+        "55-18-5",   // N-亞硝基二乙胺 (DENA)
+        "62-75-9",   // N-亞硝基二甲胺 (DMNA)
+        "59-89-2",   // N-亞硝基嗎啉 (N-Nitrosomorpholine)
+        "542-88-1",  // 雙(氯甲基)醚 (BCME)
+        "107-30-2",  // 氯甲基甲基醚 (CMME)
+        "75-44-5",   // 光氣 (Phosgene)
+        "75-15-0",   // 二硫化碳 (Carbon disulfide)
+        "505-60-2",  // 芥子氣 (Mustard gas)
+
+        // 氰化物與無機劇毒金屬化物
+        "74-90-8",   // 氫氰酸 (Hydrogen cyanide)
+        "143-33-9",  // 氰化鈉 (Sodium cyanide)
+        "151-50-8",  // 氰化鉀 (Potassium cyanide)
+        "592-01-8",  // 氰化鈣 (Calcium cyanide)
+        "1333-82-0", // 三氧化鉻/鉻酸酐 (Chromium trioxide)
+        "7778-50-9", // 重鉻酸鉀 (Potassium dichromate)
+        "10588-01-9",// 重鉻酸鈉 (Sodium dichromate)
+        "7789-09-5", // 重鉻酸銨 (Ammonium dichromate)
+        "1309-64-4", // 三氧化二銻 (Antimony trioxide)
+        "1314-62-1", // 五氧化二釩 (Vanadium pentoxide)
+        "7440-38-2", // 砷及其化合物 (Arsenic)
+        "7440-43-9", // 鎘及其化合物 (Cadmium)
+        "7439-92-1", // 鉛及其化合物 (Lead)
+        "7439-97-6", // 汞及其化合物 (Mercury)
+        "7440-02-0", // 鎳及其化合物 (Nickel)
+        "7440-41-7", // 鈹及其化合物 (Beryllium)
+        "13463-39-3",// 四羰基鎳 (Nickel carbonyl)
+        "78-00-2",   // 四乙基鉛 (Tetraethyl lead)
+        "1332-21-4", // 石綿 (Asbestos)
+
+        // 塑化劑 (鄰苯二甲酸酯類列管項)
+        "117-81-7",  // DEHP
+        "84-74-2",   // DBP
+        "85-68-7",   // BBP
+        "131-18-0",  // DPP
+        "117-84-0",  // DNOP
+        "28553-12-0",// DINP
+        "26761-40-0",// DIDP
+        "84-75-3",   // DnHP
+        "84-69-5",   // DIBP
+
+        // 多環芳香烴 (PAHs)
+        "50-32-8",   // 苯駢[a]芘 (Benzo[a]pyrene)
+        "56-55-3",   // 苯駢[a]蒽 (Benzo[a]anthracene)
+        "205-99-2",  // 苯駢[b]螢蒽 (Benzo[b]fluoranthene)
+        "207-08-9",  // 苯駢[k]螢蒽 (Benzo[k]fluoranthene)
+        "218-01-9",  // 䓛 (Chrysene)
+        "53-70-3",   // 二苯駢[a,h]蒽 (Dibenz[a,h]anthracene)
+        "193-39-5",  // 茚駢[1,2,3-cd]芘 (Indeno[1,2,3-cd]pyrene)
+
+        // 多氯聯苯與戴奧辛類
+        "1336-36-3", // 多氯聯苯 (PCBs)
+        "1746-01-6", // 2,3,7,8-TCDD (Dioxin)
+        "3268-87-9", // 1,2,3,4,6,7,8,9-OCDD
+
+        // 列管農藥、有機錫與持久性有機污染物 (POPs)
+        "50-29-3",   // DDT
+        "60-57-1",   // 狄氏劑 (Dieldrin)
+        "72-20-8",   // 異狄氏劑 (Endrin)
+        "309-00-2",  // 艾氏劑 (Aldrin)
+        "76-44-8",   // 飛布達 (Heptachlor)
+        "57-74-9",   // 氯丹 (Chlordane)
+        "8001-35-2", // 毒殺芬 (Toxaphene)
+        "2385-85-5", // 滅蟻樂 (Mirex)
+        "143-50-0",  // 錢得興 (Chlordecone)
+        "58-89-9",   // 靈丹 (Lindane)
+        "115-29-7",  // 安殺番 (Endosulfan)
+        "56-38-2",   // 巴拉松 (Parathion)
+        "298-00-0",  // 甲基巴拉松 (Methyl parathion)
+        "116-06-3",  // 涕滅威 (Aldicarb)
+        "54-11-5",   // 菸鹼/尼古丁 (Nicotine - 工業農用純品)
+        "56-35-9",   // 三丁基氧化錫 (TBTO)
+        "1461-22-9", // 三丁基氯化錫 (TBTC)
+        "1163-19-5", // 十溴二苯醚 (DecaBDE)
+        "25637-99-4" // 六溴環十二烷 (HBCD)
     ];
 
     let currentLang = 'zh';
@@ -399,7 +517,7 @@
         "LOC-RB4": "冰箱 B (C9-C10+)", "LOC-RB5": "冰箱 B (強氧化劑防護盒)"
     };
 
-    // 動態生成常溫主櫃 B-1 至 B-5
+    // 動態生成常溫主櫃 B-1 至 B-5 (每櫃 10 盒)
     for (let c = 1; c <= 5; c++) {
         cabinetMap[`LOC-B${c}`] = `藥品櫃 B-${c}`;
         for (let b = 1; b <= 10; b++) {
@@ -408,14 +526,16 @@
         }
     }
 
-    // 動態生成冷藏冰箱 R-1 的 1~20 號盒對照
-    cabinetMap[`LOC-R1`] = `冷藏冰箱 R-1`;
-    for (let r = 1; r <= 20; r++) {
-        const boxStr = r < 10 ? `0${r}` : `${r}`;
-        cabinetMap[`LOC-R1-${boxStr}`] = `冷藏冰箱 R-1-${boxStr}`;
+    // 🌟 動態生成冷藏冰箱 R-1 至 R-5 (5 層 × 每層 6 盒 = 30 盒)
+    for (let layer = 1; layer <= 5; layer++) {
+        cabinetMap[`LOC-R${layer}`] = `冷藏冰箱 R-${layer}層`;
+        for (let box = 1; box <= 6; box++) {
+            const boxStr = `0${box}`;
+            cabinetMap[`LOC-R${layer}-${boxStr}`] = `冷藏冰箱 R-${layer}-${boxStr}`;
+        }
     }
 
-    // 🌟 根據櫃位屬性回傳對應的 Bootstrap 顏色 Badge Class
+    // 根據櫃位屬性回傳對應的 Bootstrap 顏色 Badge Class
     function getLocationBadgeClass(location) {
         if (!location || location === '-') return 'bg-secondary';
         const loc = location.toUpperCase();
@@ -436,8 +556,8 @@
         if (loc.includes('冷凍') || loc.includes('F-1') || loc.includes('F1')) {
             return 'bg-primary text-white';
         }
-        // 5. 4°C 冷藏冰箱 -> 青水藍 (Info)
-        if (loc.includes('冷藏') || loc.includes('R-1') || loc.includes('R1') || loc.includes('冰箱')) {
+        // 5. 4°C 冷藏冰箱 (R-1 ~ R-5) -> 青水藍 (Info)
+        if (loc.includes('冷藏') || /R-[1-5]/.test(loc) || /R[1-5]/.test(loc) || loc.includes('冰箱')) {
             return 'bg-info text-dark';
         }
         // 6. 常溫藥品櫃 (B-1 至 B-5) 及其他常溫架位 -> 中性灰 (Secondary)
@@ -454,11 +574,11 @@
             btnScanOpen: "開啟相機掃描",
             btnScanClose: "關閉相機",
             searchLabel: "🔍 藥品搜尋 (支援中英文名稱、CAS、廠商、SMILES、條碼、盒號座標模糊搜尋)",
-            searchPlaceholder: "輸入關鍵字或盒號（如 B-1-03、R-1-12 或 D-1，留空可列出所有藥品）...",
+            searchPlaceholder: "輸入關鍵字或盒號（如 B-1-03、R-2-04 或 D-1，留空可列出所有藥品）...",
             btnSearch: "搜尋",
             lblQuickFilter: "⚡ 快速篩選：",
             filterAll: "全部",
-            filterFridge: "❄️ 冷藏 4°C",
+            filterFridge: "❄️ 冷藏 4°C (R1-R5層)",
             filterFreezer: "🧊 冷凍 -20°C",
             filterCabinet: "🚪 常溫主櫃 (B1-B5 盒)",
             filterDry: "🏜️ 乾燥櫃 (D1-D3)",
@@ -471,7 +591,7 @@
             thFormula: "分子式/分子量",
             thStructure: "2D 化學結構",
             thSafety: "安衛分類",
-            thLocation: "位置座標 (櫃-盒號)",
+            thLocation: "位置座標 (櫃/層-盒號)",
             thSpec: "規格",
             thVendor: "廠商",
             thNote: "備註",
@@ -490,9 +610,9 @@
             lblFormula: "分子式 (Formula)",
             lblMw: "分子量 (MW, g/mol)",
             lblSafety: "安衛分類 *",
-            lblLocation: "擺放位置座標 (櫃-盒號) *",
+            lblLocation: "擺放位置座標 (櫃/層-盒號) *",
             safetyPh: "可選取或輸入分類",
-            locationPh: "例如：乾燥櫃 D-1 或 B-1-03",
+            locationPh: "例如：冷藏冰箱 R-2-04",
             lblSpec: "規格 / 純度",
             lblVendor: "廠商 (Vendor)",
             vendorPh: "選取或填寫廠商",
@@ -514,11 +634,11 @@
             btnScanOpen: "Start Camera Scan",
             btnScanClose: "Close Camera",
             searchLabel: "🔍 Chemical Search (English/Chinese Name, CAS No., Vendor, SMILES, Barcode, Box Location)",
-            searchPlaceholder: "Type keywords or box code (e.g. B-1-03, R-1-12 or D-1)...",
+            searchPlaceholder: "Type keywords or box code (e.g. B-1-03, R-2-04 or D-1)...",
             btnSearch: "Search",
             lblQuickFilter: "⚡ Filter by:",
             filterAll: "All",
-            filterFridge: "❄️ Fridge 4°C",
+            filterFridge: "❄️ Fridge 4°C (R1-R5)",
             filterFreezer: "🧊 Freezer -20°C",
             filterCabinet: "🚪 Cabinet (B1-B5 Boxes)",
             filterDry: "🏜️ Dry Cabinet (D1-D3)",
@@ -531,7 +651,7 @@
             thFormula: "Formula / MW",
             thStructure: "2D Structure",
             thSafety: "Safety Class",
-            thLocation: "Location (Cabinet-Box)",
+            thLocation: "Location (Cabinet/Shelf-Box)",
             thSpec: "Spec",
             thVendor: "Vendor",
             thNote: "Note",
@@ -550,9 +670,9 @@
             lblFormula: "Formula",
             lblMw: "MW (g/mol)",
             lblSafety: "Safety Class *",
-            lblLocation: "Location (Cabinet-Box) *",
+            lblLocation: "Location (Cabinet/Shelf-Box) *",
             safetyPh: "Select or type safety class",
-            locationPh: "e.g. Dry Cabinet D-1 or B-1-03",
+            locationPh: "e.g. Fridge R-2-04",
             lblSpec: "Spec / Purity",
             lblVendor: "Vendor / Supplier",
             vendorPh: "Select or type vendor",
@@ -775,6 +895,7 @@
         isProcessingScan = false;
     }
 
+    // 🌟 輸入 CAS 時即時檢查是否為列管毒性化學物質
     function checkToxicStatus() {
         const casInput = document.getElementById('addCas').value.trim();
         const toxicAlert = document.getElementById('toxicAlert');
@@ -996,7 +1117,7 @@
         } else if (currentFilter === 'fridge') {
             currentFilteredList = rawSearchResults.filter(item => {
                 const loc = (item.location || '').toLowerCase();
-                return (loc.includes('冰箱') || loc.includes('冷藏') || loc.includes('r-1')) && !loc.includes('冷凍');
+                return (loc.includes('冰箱') || loc.includes('冷藏') || /r-[1-5]/.test(loc)) && !loc.includes('冷凍');
             });
         } else if (currentFilter === 'freezer') {
             currentFilteredList = rawSearchResults.filter(item => {
